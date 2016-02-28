@@ -118,8 +118,8 @@ Pseudocode for the OCC algorithm to implement (in the RunOCCScheduler method):
     }
 
   cleanup txn:
-    txn->reads_.empty();
-    txn->writes_.empty();
+    txn->reads_.clear();
+    txn->writes_.clear();
     txn->status_ = INCOMPLETE;
        
   Restart txn:
@@ -177,8 +177,8 @@ Pseudocode to implement in RunOCCParallelScheduler:
         Completely restart the transaction.
         
     cleanup txn:
-       txn->reads_.empty();
-       txn->writes_.empty();
+       txn->reads_.clear();
+       txn->writes_.clear();
        txn->status_ = INCOMPLETE;    
 
     Restart txn:
@@ -220,8 +220,8 @@ Pseudocode for the algorithm to implement (in the RunMVCCScheduler method):
       Completely restart the transaction.
   
   cleanup txn:
-    txn->reads_.empty();
-    txn->writes_.empty();
+    txn->reads_.clear();
+    txn->writes_.clear();
     txn->status_ = INCOMPLETE;
 
   Restart txn:
