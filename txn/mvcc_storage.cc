@@ -47,8 +47,43 @@ bool MVCCStorage::Read(Key key, Value* result, int txn_unique_id) {
   
   // Hint: Iterate the version_lists and return the verion whose write timestamp
   // (version_id) is the largest write timestamp less than or equal to txn_unique_id.
-  
-  return true;
+
+  deque<Version *> *dq = mvcc_data_[key]; // get the proper list
+  deque<Version *>::iterator it = dq->begin(); // set iterator to first record
+
+  // if the iterator is empty return false
+  if (it == dq->end()) {
+    return false;
+  }
+
+  int i = 0;
+
+  for (; it != dq->end(); ++it, ++i) {
+    // If we have passed or reached the record we are looking for
+    if (txn_unique_id >= (*it)->version_id_) {
+      result = &((*it)->value_);
+
+      // if the max_read_id_ is smaller than the current timestamp
+      if ((*it)->max_read_id_ <= txn_unique_id) {
+        //dq->at(i)->max_read_id_ = txn_unique_id;
+        (*it)->max_read_id_ = txn_unique_id;
+      }
+
+      return true;
+    }
+  }
+
+  // if the record we were looking for was the final one, the for loop fails
+  --it;
+  result = &((*it)->value_);
+
+  // if the max_read_id_ is smaller than the current id
+  if ((*it)->max_read_id_ <= txn_unique_id) {
+    //dq->at(i)->max_read_id_ = txn_unique_id;
+    (*it)->max_read_id_ = txn_unique_id;
+  }
+
+  return true; // valid record was the final one
 }
 
 
@@ -65,8 +100,36 @@ bool MVCCStorage::CheckWrite(Key key, int txn_unique_id) {
   // Note that you don't have to call Lock(key) in this method, just
   // call Lock(key) before you call this method and call Unlock(key) afterward.
   
-  
-  return true;
+  // get the list of records for key
+  deque<Version *> *dq = mvcc_data_[key];
+  deque<Version *>::iterator it = dq->begin();
+
+  // if the deque is empty
+  if (it == dq->end())
+    return true;
+
+  while (it != dq->end()) {
+    // if we've reached the insert point
+    // check to see if the write is valid
+    if ((*it)->version_id_ <= txn_unique_id) {
+      // check to see if the timestamp is past previous max_read_id_
+      if ((*it)->max_read_id_ <= txn_unique_id) {
+        return true; // the last read was before txn_unique_id
+      } else {
+        return false; // read by txn after txn_unique_id
+      }
+    }
+
+    ++it;
+  }
+
+  // reach here if all the records were newer than txn_unique_id
+  --it; // get away from dq->end()
+  if ((*it)->max_read_id_ <= txn_unique_id) {
+    return true; // the final record was read before txn_unique_id
+  }
+
+  return false; // only reach here if final record was read after txn_unique_id
 }
 
 // MVCC Write, call this method only if CheckWrite return true.
@@ -79,6 +142,46 @@ void MVCCStorage::Write(Key key, Value value, int txn_unique_id) {
   // into the version_lists. Note that InitStorage() also calls this method to init storage. 
   // Note that you don't have to call Lock(key) in this method, just
   // call Lock(key) before you call this method and call Unlock(key) afterward.
-}
 
+  if (txn_unique_id == 0) {
+    mvcc_data_[key] = new deque<Version *>();
+  }
+  
+  // create the verion
+  Version *new_version = (Version *) malloc(sizeof(Version));
+  new_version->value_ = value;
+  new_version->max_read_id_ = 0;
+  new_version->version_id_ = txn_unique_id;
+
+  // get the list of records for key
+  deque<Version *> *dq = mvcc_data_[key];
+  deque<Version *>::iterator it = dq->begin();
+
+  // if the deque is empty
+  if (it == dq->end()) {
+    dq->push_front(new_version);
+    return;
+  }
+
+  // iterate through the deque until passing all of the earlier records
+  while (it != dq->end()) {
+    // if we've reached a record that is older than txn_unique_id
+    // then we should insert new_version before that record
+    if ((*it)->version_id_ <= txn_unique_id) {
+      //--it;
+      new_version->max_read_id_ = (*it)->max_read_id_; // don't invalidate later reads
+      //++it; // want to insert after previous record (not before)
+      dq->insert(it, new_version);
+      return;
+    }
+
+    ++it;
+  }
+
+  // if all of the records are larger than the new_version
+  --it;
+  new_version->max_read_id_ = (*it)->max_read_id_; // don't invalidate later reads
+  ++it;
+  dq->insert(it, new_version);
+}
 
