@@ -88,10 +88,24 @@ class TxnProcessor {
   // transaction logic.
   void ExecuteTxn(Txn* txn);
 
+  // Performs all reads required to execute an image transaction, then executes the
+  // transaction logic.
+  void ExecuteImageTxn(Txn* txn);
+
+  void ExecuteStringTxn(Txn* txn);
+
+  void ExecuteBlogStringTxn(Txn* txn);
+
   // Applies all writes performed by '*txn' to 'storage_'.
   //
   // Requires: txn->Status() is COMPLETED_C.
   void ApplyWrites(Txn* txn);
+
+  void ApplyImageWrites(Txn* txn);
+
+  void ApplyStringWrites(Txn* txn);
+
+  void ApplyBlogStringWrites(Txn* txn);
   
   // The following functions are for MVCC
   void MVCCExecuteTxn(Txn* txn);

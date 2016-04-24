@@ -90,10 +90,12 @@ class RMW : public Txn {
   }
 
   // Constructor with randomized read/write sets
-  RMW(int dbsize, int readsetsize, int writesetsize, double time = 0)
+  RMW(int data_type, int dbsize, int readsetsize, int writesetsize, double time = 0)
       : time_(time) {
     // Make sure we can find enough unique keys.
     DCHECK(dbsize >= readsetsize + writesetsize);
+
+    data_type_ = data_type;
 
     // Find readsetsize unique read keys.
     for (int i = 0; i < readsetsize; i++) {

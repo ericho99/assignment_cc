@@ -36,6 +36,38 @@ class Storage {
   
   // Init storage
   virtual void InitStorage();
+
+
+  // modified code for images
+
+  virtual bool ReadImage(Key key, Image* result, int txn_unique_id = 0);
+
+  virtual void WriteImage(Key key, Image image, int txn_unique_id = 0);
+  
+  // Init image storage (1000 images that are 500KB each)
+  virtual void InitImageStorage();
+
+
+  // modified code for strings
+
+  virtual bool ReadString(Key key, String* result, int txn_unique_id = 0);
+
+  virtual void WriteString(Key key, String str, int txn_unique_id = 0);
+  
+  // Init image storage (1000 images that are 500KB each)
+  virtual void InitStringStorage();
+
+
+  // modified code for blog strings
+
+  virtual bool ReadBlogString(Key key, BlogString* result, int txn_unique_id = 0);
+
+  virtual void WriteBlogString(Key key, BlogString str, int txn_unique_id = 0);
+  
+  // Init image storage (1000 images that are 500KB each)
+  virtual void InitBlogStringStorage();
+
+
   
   virtual ~Storage() {}
   
@@ -52,6 +84,15 @@ class Storage {
    
    // Collection of <key, value> pairs. Use this for single-version storage
    unordered_map<Key, Value> data_;
+
+   // Collection of <key, image> pairs. Use this for image storage
+   unordered_map<Key, Image> images_;
+
+   // Collection of <key, string> pairs. Use this for string storage
+   unordered_map<Key, String> strings_;
+
+   // Collection of <key, blog string> pairs. Use this for blog string storage
+   unordered_map<Key, BlogString> blog_strings_;
   
    // Timestamps at which each key was last updated.
    unordered_map<Key, double> timestamps_;
