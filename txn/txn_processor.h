@@ -33,6 +33,7 @@ enum CCMode {
   OCC = 3,                     // Part 2
   P_OCC = 4,                   // Part 3
   MVCC = 5,
+  TWOPL = 6,                     // Final Project 2PL
 };
 
 // Returns a human-readable string naming of the providing mode.
@@ -71,6 +72,9 @@ class TxnProcessor {
 
   // Serial version of scheduler.
   void RunSerialScheduler();
+
+  // Locking version of scheduler for 2 phase locking.
+  void RunLockingSchedulerTwo();
 
   // Locking version of scheduler.
   void RunLockingScheduler();

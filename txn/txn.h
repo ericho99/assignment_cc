@@ -40,6 +40,9 @@ class Txn {
   // an error occurs.
   void CheckReadWriteSets();
 
+  // Unique, monotonically increasing transaction ID, assigned by TxnProcessor.
+  uint64 unique_id_;
+
  protected:
   // Copies the internals of this txn into a given transaction (i.e.
   // the readset, writeset, and so forth).  Be sure to modify this method
@@ -132,9 +135,6 @@ class Txn {
 
   // Transaction's current execution status.
   TxnStatus status_;
-
-  // Unique, monotonically increasing transaction ID, assigned by TxnProcessor.
-  uint64 unique_id_;
 
   // Start time (used for OCC).
   double occ_start_time_;
