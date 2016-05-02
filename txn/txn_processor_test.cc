@@ -172,7 +172,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
       mode <= TWOPL;
       mode = static_cast<CCMode>(mode+1)) {
 
-    if (mode != 0){
+    if (mode != 6){
       continue;
     }
 
@@ -183,6 +183,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
 
     // For each experiment, run 3 times and get the average.
     for (uint32 exp = 0; exp < lg.size(); exp++) {
+      // printf("made it through here\n");
       double throughput[3];
       for (uint32 round = 0; round < 3; round++) {
 
@@ -190,7 +191,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
 
         // Create TxnProcessor in next mode.
         TxnProcessor* p = new TxnProcessor(mode);
-
+        
         // Record start time.
         double start = GetTime();
 

@@ -209,7 +209,18 @@ void TxnProcessor::RunLockingSchedulerTwo() {
     while (completed_txns_.Pop(&txn)) {
       // Commit/abort txn according to program logic's commit/abort decision.
       if (txn->Status() == COMPLETED_C) {
-        ApplyWrites(txn);
+        if (txn->data_type_ == 1){
+          ApplyWrites(txn);
+        }
+        else if (txn->data_type_ == 2){
+          ApplyImageWrites(txn);
+        }
+        else if (txn->data_type_ == 3){
+          ApplyStringWrites(txn);
+        }
+        else if (txn->data_type_ == 4){
+          ApplyBlogStringWrites(txn);
+        }
         txn->status_ = COMMITTED;
       } else if (txn->Status() == COMPLETED_A) {
         txn->status_ = ABORTED;
@@ -240,11 +251,40 @@ void TxnProcessor::RunLockingSchedulerTwo() {
       txn = ready_txns_.front();
       ready_txns_.pop_front();
 
-      // Start txn running in its own thread.
-      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+      if (txn->data_type_ == 1){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
             this,
             &TxnProcessor::ExecuteTxn,
             txn));
+      }
+      else if (txn->data_type_ == 2){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteImageTxn,
+            txn));
+      }
+      else if (txn->data_type_ == 3){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteStringTxn,
+            txn));
+      }
+      else if (txn->data_type_ == 4){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteBlogStringTxn,
+            txn));
+      }
+
+      // // Start txn running in its own thread.
+      // tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+      //       this,
+      //       &TxnProcessor::ExecuteTxn,
+      //       txn));
 
     }
   }
