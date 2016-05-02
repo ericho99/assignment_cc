@@ -67,6 +67,8 @@ class LockManager {
   // held, SHARED or EXCLUSIVE if it is, depending on the current state.
   virtual LockMode Status(const Key& key, vector<Txn*>* owners) = 0;
 
+  virtual bool ReadyExecute(Txn *txn) = 0;
+
  protected:
   // The LockManager's lock table tracks all lock requests. For a given key, if
   // 'lock_table_' contains a nonempty deque, then the item with that key is
@@ -122,6 +124,7 @@ class LockManagerA : public LockManager {
   virtual bool WriteLock(Txn* txn, const Key& key);
   virtual void Release(Txn* txn, const Key& key);
   virtual LockMode Status(const Key& key, vector<Txn*>* owners);
+  virtual bool ReadyExecute(Txn *txn);
 };
 
 // Version of the LockManager implementing both shared and exclusive locks.
@@ -134,7 +137,22 @@ class LockManagerB : public LockManager {
   virtual bool WriteLock(Txn* txn, const Key& key);
   virtual void Release(Txn* txn, const Key& key);
   virtual LockMode Status(const Key& key, vector<Txn*>* owners);
+  virtual bool ReadyExecute(Txn *txn);
 };
+
+// Version of the LockManager implemented for final project - strict 2PL
+class LockManagerC : public LockManager {
+ public:
+  explicit LockManagerC(deque<Txn*>* ready_txns);
+  inline virtual ~LockManagerC() {}
+
+  virtual bool ReadLock(Txn* txn, const Key& key);
+  virtual bool WriteLock(Txn* txn, const Key& key);
+  virtual void Release(Txn* txn, const Key& key);
+  virtual LockMode Status(const Key& key, vector<Txn*>* owners);
+  virtual bool ReadyExecute(Txn *txn);
+};
+
 
 #endif  // _LOCK_MANAGER_H_
 
