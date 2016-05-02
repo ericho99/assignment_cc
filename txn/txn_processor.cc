@@ -145,13 +145,11 @@ void TxnProcessor::RunLockingSchedulerTwo() {
   while (tp_.Active()) {
     // Start processing the next incoming transaction request.
     if (txn_requests_.Pop(&txn)) {
-      //printf("started txn %lu\n", txn->unique_id_);
       bool blocked = false;
       // Request read locks.
       for (set<Key>::iterator it = txn->readset_.begin();
            it != txn->readset_.end(); ++it) {
         if (!lm_->ReadLock(txn, *it)) {
-          //printf("blocked stuff\n");
           blocked = true;
           // If readset_.size() + writeset_.size() > 1, and blocked, just abort
           if (txn->readset_.size() + txn->writeset_.size() > 1) {
@@ -196,14 +194,9 @@ void TxnProcessor::RunLockingSchedulerTwo() {
       // ready to be executed. Else, just restart the txn
       if (blocked == false) {
         if (lm_->ReadyExecute(txn)) {
-          //printf("executed the transaction\n");
           ready_txns_.push_back(txn);
         }
       } else if (blocked == true && (txn->writeset_.size() + txn->readset_.size() > 1)){
-        //if (!lm_->ReadyExecute(txn)) {
-        //  printf("MY SUSPICIONS ARE CONFIRMED\n"); 
-        //}
-        //printf("aborted txn %lu\n", txn->unique_id_);
         mutex_.Lock();
         //txn->unique_id_ = next_unique_id_;
         //next_unique_id_++;

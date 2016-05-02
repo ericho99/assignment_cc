@@ -168,7 +168,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
   deque<Txn*> doneTxns;
 
   // For each MODE...
-  for (CCMode mode = TWOPL;
+  for (CCMode mode = SERIAL;
       mode <= TWOPL;
       mode = static_cast<CCMode>(mode+1)) {
 
