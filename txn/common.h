@@ -44,6 +44,21 @@ typedef uint64_t uint64;
 typedef uint64 Key;
 typedef uint64 Value;
 
+// Define standard image to be array of 500KB (to use for Facebook approximation)
+typedef struct Image {
+    char byte[500000];
+} Image;
+
+// Define standard string to be array of .1KB (to use for Facebook approximation)
+typedef struct String {
+    char byte[100];
+} String;
+
+// Define standard string to be array of 2KB (to use for Amazon and blog approximations)
+typedef struct BlogString {
+    char byte[2000];
+} BlogString;
+
 // Returns the number of seconds since midnight according to local system time,
 // to the nearest microsecond.
 static inline double GetTime() {

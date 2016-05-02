@@ -99,6 +99,40 @@ class Txn {
   // Key, Value pairs WRITTEN by the transaction.
   map<Key, Value> writes_;
 
+
+  //modified code for images
+
+   // Results of reads performed by the transaction.
+  map<Key, Image> readsIMG_;
+
+  // Key, Value pairs WRITTEN by the transaction.
+  map<Key, Image> writesIMG_;
+
+
+  //modified code for strings
+
+   // Results of reads performed by the transaction.
+  map<Key, String> readsSTR_;
+
+  // Key, Value pairs WRITTEN by the transaction.
+  map<Key, String> writesSTR_;
+
+
+  //modified code for blog strings
+
+   // Results of reads performed by the transaction.
+  map<Key, BlogString> readsBSTR_;
+
+  // Key, Value pairs WRITTEN by the transaction.
+  map<Key, BlogString> writesBSTR_;
+
+
+  // data type: 1=numeric, 2=image, 3=string, 4=blogstring
+
+  int data_type_;
+
+
+
   // Transaction's current execution status.
   TxnStatus status_;
 
