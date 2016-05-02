@@ -544,7 +544,7 @@ int main(int argc, char** argv) {
     delete lg[i];
   lg.clear();
 
-
+}
 
 
   // cout << "\t\t\t    WEB APPLICATIONS" << endl;
@@ -657,9 +657,4 @@ int main(int argc, char** argv) {
 
   // Benchmark(lg);
 
-  // for (uint32 i = 0; i < lg.size(); i++)
-  //   delete lg[i];
-  // lg.clear();
-  
-}
-
+  // for (uint32 i = 0; i <
