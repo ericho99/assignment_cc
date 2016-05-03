@@ -10,6 +10,7 @@
 #include <deque>
 #include <map>
 #include <vector>
+#include <pthread.h>
 
 #include "txn/common.h"
 
@@ -112,6 +113,15 @@ class LockManager {
   // 'txn_waits_' are invalided by any call to Release() with the entry's
   // txn.
   unordered_map<Txn*, int> txn_waits_;
+
+  // table of pthread locks for each key in lock table
+  unordered_map<Key, pthread_mutex_t> mutex_table_;
+
+  // locks the whole lock table
+  pthread_mutex_t lock_table_lock_; 
+
+  // locks the pthread mutex table
+  pthread_mutex_t mutex_table_lock_;
 };
 
 // Version of the LockManager implementing ONLY exclusive locks.
@@ -164,6 +174,7 @@ class LockManagerD : public LockManager {
   virtual void Release(Txn* txn, const Key& key);
   virtual LockMode Status(const Key& key, vector<Txn*>* owners);
   virtual bool ReadyExecute(Txn *txn);
+
 };
 #endif  // _LOCK_MANAGER_H_
 

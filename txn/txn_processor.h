@@ -19,8 +19,6 @@
 #include "utils/mutex.h"
 #include "utils/condition.h"
 
-#include <algorithm>
-
 
 using std::deque;
 using std::map;
