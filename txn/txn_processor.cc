@@ -6,6 +6,7 @@
 #include "txn/txn_processor.h"
 #include <stdio.h>
 #include <set>
+#include <stdlib.h>
 
 #include "txn/lock_manager.h"
 
@@ -20,6 +21,8 @@ TxnProcessor::TxnProcessor(CCMode mode)
     lm_ = new LockManagerB(&ready_txns_);
   else if (mode == TWOPL)
     lm_ = new LockManagerC(&ready_txns_);
+  else if (mode == TWOPL2)
+    lm_ = new LockManagerD(&ready_txns_);
   
   // Create the storage
   if (mode_ == MVCC) {
@@ -28,12 +31,10 @@ TxnProcessor::TxnProcessor(CCMode mode)
     storage_ = new Storage();
   }
   
-  // printf("in here\n");
   storage_->InitStorage();
   storage_->InitImageStorage();
   storage_->InitStringStorage();
   storage_->InitBlogStringStorage();
-  // printf("got here\n");
 
   // Start 'RunScheduler()' running.
   cpu_set_t cpuset;
@@ -59,7 +60,7 @@ void* TxnProcessor::StartScheduler(void * arg) {
 }
 
 TxnProcessor::~TxnProcessor() {
-  if (mode_ == LOCKING_EXCLUSIVE_ONLY || mode_ == LOCKING || mode_ == TWOPL)
+  if (mode_ == LOCKING_EXCLUSIVE_ONLY || mode_ == LOCKING || mode_ == TWOPL || mode_ == TWOPL2)
     delete lm_;
     
   delete storage_;
@@ -94,6 +95,7 @@ void TxnProcessor::RunScheduler() {
     case P_OCC:                  RunOCCParallelScheduler(); break;
     case MVCC:                   RunMVCCScheduler(); break;
     case TWOPL:                  RunLockingSchedulerTwo(); break;
+    case TWOPL2:                 RunTwoScheduler(); break;
   }
 }
 
@@ -141,6 +143,142 @@ void TxnProcessor::RunSerialScheduler() {
 
       // Return result to client.
       txn_results_.Push(txn);
+    }
+  }
+}
+
+Key *TxnProcessor::KeySorter(set<Key>* set) {
+  int len = set->size();
+  Key* sorted;
+  sorted = (Key *) malloc(len * sizeof(Key));
+  int i = 0;
+  std::set<Key>::iterator it = set->begin();
+  for (; it != set->end(); ++it) {
+    sorted[i] = *it;
+    i++;
+  }
+ 
+  for (int x = 0; x < len - 1; x++) {
+    for (int y = 1; y < len; y++) {
+      if (x < y) {
+        Key temp = sorted[x];
+        sorted[x] = sorted[y];
+        sorted[y] = temp;
+      }
+    }
+  }
+ 
+  return sorted;
+}
+
+void TxnProcessor::StartTwoExecuting(Txn *txn) {
+  // Get the start time
+  txn->occ_start_time_ = GetTime();
+
+  Key *sortedReadset = KeySorter(&(txn->readset_));
+
+  uint64_t i;
+  for (i = 0; i < sizeof(sortedReadset); ++i) {
+    Key current = sortedReadset[i];
+
+    while (!lm_->ReadLock(txn, current)) {
+      sleep(5); // adjust this if necessary
+    }
+
+    if (txn->data_type_ == 1) {
+      Value result;
+      if (storage_->Read(current, &result))
+        txn->reads_[current] = result;
+    }
+    else if (txn->data_type_ == 2) {
+      Image result;
+      if (storage_->ReadImage(current, &result))
+        txn->readsIMG_[current] = result;
+    }
+    else if (txn->data_type_ == 3) {
+      String result;
+      if (storage_->ReadString(current, &result))
+        txn->readsSTR_[current] = result;
+    }
+    else if (txn->data_type_ == 4) {
+      BlogString result;
+      if (storage_->ReadBlogString(current, &result))
+        txn->readsBSTR_[current] = result;
+    }
+  }
+
+  Key *sortedWriteset = KeySorter(&(txn->writeset_));
+
+  for (i = 0; i < sizeof(sortedWriteset); ++i) {
+    Key current = sortedWriteset[i];
+    while (!lm_->WriteLock(txn, current)) {
+      sleep(5); // adjust this if necessary
+    }
+
+    if (txn->data_type_ == 1) {
+      Value result;
+      if (storage_->Read(current, &result)) {
+        txn->writes_[current] = result;
+      }
+
+      storage_->Write(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 2) {
+      Image result;
+      if (storage_->ReadImage(current, &result)) {
+        txn->readsIMG_[current] = result;
+      }
+
+      storage_->WriteImage(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 3) {
+      String result;
+      if (storage_->ReadString(current, &result)) {
+        txn->readsSTR_[current] = result;
+      }
+
+      storage_->WriteString(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 4) {
+      BlogString result;
+      if (storage_->ReadBlogString(current, &result)) {
+        txn->readsBSTR_[current] = result;
+      }
+
+      storage_->WriteBlogString(current, result, txn->unique_id_);
+    }
+  }
+
+  // Execute txn's program logic.
+  txn->Run();
+
+  // shrinking phase
+  for (set<Key>::iterator it = txn->readset_.begin();
+       it != txn->readset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+
+  // Release write locks.
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+
+  // Return result to client.
+  txn_results_.Push(txn);
+  return;
+}
+
+void TxnProcessor::RunTwoScheduler() {
+  Txn* txn;
+  while (tp_.Active()) {
+    // Start processing the next incoming transaction request.
+    if (txn_requests_.Pop(&txn)) {
+      // Start txn running in its own thread.
+      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+          this,
+          &TxnProcessor::StartTwoExecuting,
+          txn));
     }
   }
 }
@@ -441,30 +579,6 @@ void TxnProcessor::RunLockingScheduler() {
 
     }
   }
-}
-
-Key * TxnProcessor::KeySorter(set<Key>* set) {
-  int len = set->size();
-  Key* sorted;
-  sorted = (Key *) malloc(len * sizeof(Key));
-  int i = 0;
-  std::set<Key>::iterator it = set->begin();
-  for (; it != set->end(); ++it) {
-    sorted[i] = *it;
-    i++;
-  }
-
-  for (int x = 0; x < len - 1; x++) {
-    for (int y = 1; y < len; y++) {
-      if (x < y) {
-        Key temp = sorted[x];
-        sorted[x] = sorted[y];
-        sorted[y] = temp;
-      }
-    }
-  }
-
-  return sorted;
 }
 
 void TxnProcessor::ExecuteTxn(Txn* txn) {

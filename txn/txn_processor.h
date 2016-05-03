@@ -36,6 +36,7 @@ enum CCMode {
   P_OCC = 4,                   // Part 3
   MVCC = 5,
   TWOPL = 6,                     // Final Project 2PL
+  TWOPL2 = 7,
 };
 
 // Returns a human-readable string naming of the providing mode.
@@ -65,6 +66,7 @@ class TxnProcessor {
   static void* StartScheduler(void * arg);
   
  private:
+  Key* KeySorter(set<Key>* set);
 
   // Serial validation
   bool SerialValidate(Txn *txn);
@@ -74,6 +76,10 @@ class TxnProcessor {
 
   // Serial version of scheduler.
   void RunSerialScheduler();
+
+
+  // Better 2 phase locking
+  void RunTwoScheduler();
 
   // Locking version of scheduler for 2 phase locking.
   void RunLockingSchedulerTwo();
@@ -89,6 +95,9 @@ class TxnProcessor {
   
   // MVCC version of scheduler.
   void RunMVCCScheduler();
+
+  // thread for improved two phase locking
+  void StartTwoExecuting(Txn* txn);
 
   // Performs all reads required to execute the transaction, then executes the
   // transaction logic.
@@ -126,8 +135,6 @@ class TxnProcessor {
   void MVCCUnlockWriteKeys(Txn* txn);
   
   void GarbageCollection();
-
-  Key * KeySorter(set<Key>* set);
   
   // Concurrency control mechanism the TxnProcessor is currently using.
   CCMode mode_;

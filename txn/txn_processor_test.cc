@@ -17,7 +17,8 @@ string ModeToString(CCMode mode) {
     case OCC:                    return " OCC      ";
     case P_OCC:                  return " OCC-P    ";
     case MVCC:                   return " MVCC     ";
-    case TWOPL:                  return " 2PL";
+    case TWOPL:                  return " 2 Phase Locking";
+    case TWOPL2:                 return " 2PL";
     default:                     return "INVALID MODE";
   }
 }
@@ -182,10 +183,10 @@ void Benchmark(const vector<LoadGen*>& lg) {
 
   // For each MODE...
   for (CCMode mode = SERIAL;
-      mode <= TWOPL;
+      mode <= TWOPL2;
       mode = static_cast<CCMode>(mode+1)) {
 
-    if (mode != 6){
+    if (mode != 7){
       continue;
     }
 

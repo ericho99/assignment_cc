@@ -7,6 +7,141 @@
 #include "txn/lock_manager.h"
 #include "txn/txn.h"
 
+LockManagerD::LockManagerD(deque<Txn*>* ready_txns) {
+  ready_txns_ = ready_txns;
+}
+
+bool LockManagerD::WriteLock(Txn* txn, const Key& key) {
+  // CPSC 438/538:
+  //
+  // Implement this method!
+
+  // find the key in the lock table
+  unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
+  if (it == lock_table_.end()) {
+    // create a deque at the key
+    deque<LockRequest> *newTxnDeque = new deque<LockRequest>();
+    LockRequest lr(EXCLUSIVE, txn);
+    newTxnDeque->push_back(lr);
+    lock_table_.insert({key, newTxnDeque});
+    return true;
+  } else {
+    deque<LockRequest> *txnDeque = it->second;
+
+    // if it's the only transaction, then we grant the lock
+    if (txnDeque->size() == 0) {
+      // push the transaction to the back of the deque
+      LockRequest lr(EXCLUSIVE, txn);
+      txnDeque->push_back(lr);
+      return true;
+    }
+
+    return false;
+  }
+}
+
+bool LockManagerD::ReadLock(Txn* txn, const Key& key) {
+  // CPSC 438/538:
+  //
+  // Implement this method!
+  
+  // find the key in the lock table
+  unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
+  if (it == lock_table_.end()) {
+    // create a deque at the key
+    deque<LockRequest> *newTxnDeque = new deque<LockRequest>();
+    LockRequest lr(SHARED, txn);
+    newTxnDeque->push_back(lr);
+    lock_table_.insert({key, newTxnDeque});
+    return true;
+  } else {
+    deque<LockRequest> *txnDeque = it->second;
+
+    // also stores whether there are only shared lock requests in the deque
+    bool onlyShared = true;
+    for (deque<LockRequest>::iterator dit = txnDeque->begin(); dit != txnDeque->end(); ++dit) {
+      if (dit->mode_ != SHARED) {
+        onlyShared = false;
+        break;
+      }
+    }
+
+    if (txnDeque->size() == 0 or onlyShared) {
+      // push the transaction to the back of the deque
+      LockRequest lr(SHARED, txn);
+      txnDeque->push_back(lr);
+      return true;
+    }
+
+    return false;
+  }
+}
+
+void LockManagerD::Release(Txn* txn, const Key& key) {
+  // CPSC 438/538:
+  //
+  // Implement this method!
+
+  // find the deque
+  unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
+  if (it == lock_table_.end()){
+    return; 
+  } else {
+    deque<LockRequest> *txnDeque = it->second;
+    // iterate over elements of the deque to find the txn
+    for (deque<LockRequest>::iterator it = txnDeque->begin(); it != txnDeque->end(); ++it) {
+      if (it->txn_ == txn) {
+        txnDeque->erase(it);
+      }
+    }
+  }
+}
+
+LockMode LockManagerD::Status(const Key& key, vector<Txn*>* owners) {
+  // CPSC 438/538:
+  //
+  // Implement this method!
+
+  // clear owners first
+  owners->clear();
+
+  unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
+  if (it == lock_table_.end()){
+    return UNLOCKED;
+  }
+
+  // return the first one because we require exclusive locks
+  // check if deque is empty first
+  deque<LockRequest> *txnDeque = it->second;
+  if (txnDeque->empty()) {
+    return UNLOCKED;
+  }
+
+  // return prefix of shared locks or first exclusive lock
+  bool sawShared = false;
+  for (deque<LockRequest>::iterator it = txnDeque->begin(); it != txnDeque->end(); ++it) {
+    if (it->mode_ == EXCLUSIVE and sawShared == false) {
+      owners->push_back(it->txn_);
+      return EXCLUSIVE;
+    } else if (it->mode_ == SHARED) {
+      owners->push_back(it->txn_);
+      sawShared = true;
+    } else if (sawShared) {
+      return SHARED;
+    } else {
+      printf("SHOULDNT GET HERE: ERROR\n");
+      return UNLOCKED;
+    }
+  }
+
+  return SHARED;
+}
+
+bool LockManagerD::ReadyExecute(Txn *txn) {
+  return true;
+}
+
+
 LockManagerC::LockManagerC(deque<Txn*>* ready_txns) {
   ready_txns_ = ready_txns;
 }

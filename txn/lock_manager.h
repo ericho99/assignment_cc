@@ -153,6 +153,17 @@ class LockManagerC : public LockManager {
   virtual bool ReadyExecute(Txn *txn);
 };
 
+// Better version of the LockManager implemented for final project - strict 2PL
+class LockManagerD : public LockManager {
+ public:
+  explicit LockManagerD(deque<Txn*>* ready_txns);
+  inline virtual ~LockManagerD() {}
 
+  virtual bool ReadLock(Txn* txn, const Key& key);
+  virtual bool WriteLock(Txn* txn, const Key& key);
+  virtual void Release(Txn* txn, const Key& key);
+  virtual LockMode Status(const Key& key, vector<Txn*>* owners);
+  virtual bool ReadyExecute(Txn *txn);
+};
 #endif  // _LOCK_MANAGER_H_
 
