@@ -65,7 +65,7 @@ void Storage::WriteImage(Key key, Image image, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitImageStorage() {
-  for (int i = 0; i < 100;i++) {
+  for (int i = 0; i < 1000;i++) {
     Image img;
     for (int x = 0; x < 50; x++) {
       img.byte[x] = 'a';
@@ -106,7 +106,7 @@ void Storage::WriteString(Key key, String str, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitStringStorage() {
-  for (int i = 0; i < 100;i++) {
+  for (int i = 0; i < 1000;i++) {
     String str;
     for (int x = 0; x < 10; x++) {
       str.byte[x] = 'a';
@@ -146,7 +146,7 @@ void Storage::WriteBlogString(Key key, BlogString str, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitBlogStringStorage() {
-  for (int i = 0; i < 100;i++) {
+  for (int i = 0; i < 1000;i++) {
     BlogString str;
     for (int x = 0; x < 20; x++) {
       str.byte[x] = 'a';

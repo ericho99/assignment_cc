@@ -73,6 +73,8 @@ class RMWLoadGenFB : public LoadGen {
   // }
   virtual Txn* NewTxn() {
 
+    // printf("dbsize_ is %d\n", dbsize_);
+
     int r = rand() % 100;
     if (r < 0) // 0% are numbers
       return new RMW(1, dbsize_, rsetsize_, wsetsize_, wait_time_);
@@ -186,7 +188,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
       mode <= TWOPL2;
       mode = static_cast<CCMode>(mode+1)) {
 
-    if (mode != 7){
+    if (mode != 3){
       continue;
     }
 
@@ -399,11 +401,11 @@ int main(int argc, char** argv) {
   cout << endl;
 
   cout << "'Low contention to high contention' Read only (5 records)" << endl;
-  lg.push_back(new RMWLoadGenFB(1000000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(10000, 5, 0, 0.0001));
   lg.push_back(new RMWLoadGenFB(1000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 5, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -412,11 +414,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read only (20 records)" << endl;
-  lg.push_back(new RMWLoadGenFB(1000000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(10000, 20, 0, 0.0001));
   lg.push_back(new RMWLoadGenFB(1000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 20, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -425,11 +427,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (5 records)" << endl;
-  lg.push_back(new RMWLoadGenFB(1000000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenFB(10000, 0, 5, 0.0001));
   lg.push_back(new RMWLoadGenFB(1000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 0, 5, 0.0001));
 
   Benchmark(lg);
 
@@ -438,11 +440,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (20 records)" << endl;
-  lg.push_back(new RMWLoadGenFB(1000000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenFB(10000, 0, 20, 0.0001));
   lg.push_back(new RMWLoadGenFB(1000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenFB(100, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 0, 20, 0.0001));
 
   Benchmark(lg);
 
@@ -456,11 +458,11 @@ int main(int argc, char** argv) {
   cout << endl;
 
   cout << "'Low contention to high contention' Read only (5 records)" << endl;
-  lg.push_back(new RMWLoadGenAmazon(1000000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(10000, 5, 0, 0.0001));
   lg.push_back(new RMWLoadGenAmazon(1000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(800, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(600, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(400, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(200, 5, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -469,11 +471,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read only (20 records)" << endl;
-  lg.push_back(new RMWLoadGenAmazon(1000000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(10000, 20, 0, 0.0001));
   lg.push_back(new RMWLoadGenAmazon(1000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(800, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(600, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(400, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(200, 20, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -482,11 +484,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (5 records)" << endl;
-  lg.push_back(new RMWLoadGenAmazon(1000000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(10000, 0, 5, 0.0001));
   lg.push_back(new RMWLoadGenAmazon(1000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(800, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(600, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(400, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(200, 0, 5, 0.0001));
 
   Benchmark(lg);
 
@@ -495,11 +497,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (20 records)" << endl;
-  lg.push_back(new RMWLoadGenAmazon(1000000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(10000, 0, 20, 0.0001));
   lg.push_back(new RMWLoadGenAmazon(1000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenAmazon(100, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(800, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(600, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(400, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenAmazon(200, 0, 20, 0.0001));
 
   Benchmark(lg);
 
@@ -513,11 +515,11 @@ int main(int argc, char** argv) {
   cout << endl;
 
   cout << "'Low contention to high contention' Read only (5 records)" << endl;
-  lg.push_back(new RMWLoadGenBlog(1000000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(10000, 5, 0, 0.0001));
   lg.push_back(new RMWLoadGenBlog(1000, 5, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(800, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(600, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(400, 5, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(200, 5, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -526,11 +528,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read only (20 records)" << endl;
-  lg.push_back(new RMWLoadGenBlog(1000000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(10000, 20, 0, 0.0001));
   lg.push_back(new RMWLoadGenBlog(1000, 20, 0, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(800, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(600, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(400, 20, 0, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(200, 20, 0, 0.0001));
 
   Benchmark(lg);
 
@@ -539,11 +541,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (5 records)" << endl;
-  lg.push_back(new RMWLoadGenBlog(1000000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(10000, 0, 5, 0.0001));
   lg.push_back(new RMWLoadGenBlog(1000, 0, 5, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(800, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(600, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(400, 0, 5, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(200, 0, 5, 0.0001));
 
   Benchmark(lg);
 
@@ -552,11 +554,11 @@ int main(int argc, char** argv) {
   lg.clear();
 
   cout << "'Low contention to high contention' Read-Write (20 records)" << endl;
-  lg.push_back(new RMWLoadGenBlog(1000000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(10000, 0, 20, 0.0001));
   lg.push_back(new RMWLoadGenBlog(1000, 0, 20, 0.0001));
-  lg.push_back(new RMWLoadGenBlog(100, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(800, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(600, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(400, 0, 20, 0.0001));
+  lg.push_back(new RMWLoadGenBlog(200, 0, 20, 0.0001));
 
   Benchmark(lg);
 
