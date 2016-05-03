@@ -149,6 +149,10 @@ void TxnProcessor::RunSerialScheduler() {
 
 Key *TxnProcessor::KeySorter(set<Key>* set) {
   int len = set->size();
+  if (len == 0) {
+    return 0;
+  }
+
   Key* sorted;
   sorted = (Key *) malloc(len * sizeof(Key));
   int i = 0;
@@ -167,22 +171,22 @@ Key *TxnProcessor::KeySorter(set<Key>* set) {
       }
     }
   }
- 
+
   return sorted;
 }
 
 void TxnProcessor::StartTwoExecuting(Txn *txn) {
-  // Get the start time
-  txn->occ_start_time_ = GetTime();
-
   Key *sortedReadset = KeySorter(&(txn->readset_));
 
   uint64_t i;
-  for (i = 0; i < sizeof(sortedReadset); ++i) {
+  for (i = 0; i < txn->readset_.size(); ++i) {
+    //printf("got read %lu\n", txn->unique_id_);
     Key current = sortedReadset[i];
 
     while (!lm_->ReadLock(txn, current)) {
-      sleep(5); // adjust this if necessary
+      //continue;
+      //printf("OWIEJFOIWJEFOIJWEFIJWOEIFIOWEFIOWEIFJWIOEFJOIWEJFOIJWEFIWEJ\n");
+      sleep(1); // adjust this if necessary
     }
 
     if (txn->data_type_ == 1) {
@@ -207,12 +211,16 @@ void TxnProcessor::StartTwoExecuting(Txn *txn) {
     }
   }
 
+  free(sortedReadset);
+
   Key *sortedWriteset = KeySorter(&(txn->writeset_));
 
-  for (i = 0; i < sizeof(sortedWriteset); ++i) {
+  for (i = 0; i < txn->writeset_.size(); ++i) {
+    printf("got write BADBADBADBADBAD\n");
     Key current = sortedWriteset[i];
     while (!lm_->WriteLock(txn, current)) {
-      sleep(5); // adjust this if necessary
+      //continue;
+      sleep(1); // adjust this if necessary
     }
 
     if (txn->data_type_ == 1) {
@@ -249,14 +257,21 @@ void TxnProcessor::StartTwoExecuting(Txn *txn) {
     }
   }
 
+  free(sortedWriteset);
+
   // Execute txn's program logic.
   txn->Run();
 
   // shrinking phase
-  for (set<Key>::iterator it = txn->readset_.begin();
-       it != txn->readset_.end(); ++it) {
-    lm_->Release(txn, *it);
+  for (i = 0; i < txn->readset_.size(); ++i) {
+    Key current = sortedReadset[i];
+    lm_->Release(txn, current);
   }
+
+  //for (set<Key>::iterator it = txn->readset_.begin();
+  //     it != txn->readset_.end(); ++it) {
+  //  lm_->Release(txn, *it);
+  //}
 
   // Release write locks.
   for (set<Key>::iterator it = txn->writeset_.begin();
@@ -266,6 +281,7 @@ void TxnProcessor::StartTwoExecuting(Txn *txn) {
 
   // Return result to client.
   txn_results_.Push(txn);
+  //printf("finishing a txn\n");
   return;
 }
 
@@ -274,6 +290,7 @@ void TxnProcessor::RunTwoScheduler() {
   while (tp_.Active()) {
     // Start processing the next incoming transaction request.
     if (txn_requests_.Pop(&txn)) {
+      //printf("popping a txn\n");
       // Start txn running in its own thread.
       tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
           this,

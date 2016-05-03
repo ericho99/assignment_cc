@@ -45,6 +45,7 @@ bool LockManagerD::ReadLock(Txn* txn, const Key& key) {
   //
   // Implement this method!
   
+  //printf("reading\n");
   // find the key in the lock table
   unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
   if (it == lock_table_.end()) {
@@ -61,11 +62,19 @@ bool LockManagerD::ReadLock(Txn* txn, const Key& key) {
     bool onlyShared = true;
     for (deque<LockRequest>::iterator dit = txnDeque->begin(); dit != txnDeque->end(); ++dit) {
       if (dit->mode_ != SHARED) {
-        onlyShared = false;
+        if (dit->mode_ == UNLOCKED) {
+          txnDeque->erase(dit);
+          return false;
+        }
+        //printf("right before core dump?\n");
+        //printf("mode is %d transaction id is %lu\n", dit->mode_, dit->txn_->unique_id_);
+        //printf("not a shared thing\n");
+        //onlyShared = false;
         break;
       }
     }
 
+    //printf("read\n");
     if (txnDeque->size() == 0 or onlyShared) {
       // push the transaction to the back of the deque
       LockRequest lr(SHARED, txn);
@@ -82,6 +91,7 @@ void LockManagerD::Release(Txn* txn, const Key& key) {
   //
   // Implement this method!
 
+  //printf("releasing\n");
   // find the deque
   unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
   if (it == lock_table_.end()){
@@ -92,9 +102,11 @@ void LockManagerD::Release(Txn* txn, const Key& key) {
     for (deque<LockRequest>::iterator it = txnDeque->begin(); it != txnDeque->end(); ++it) {
       if (it->txn_ == txn) {
         txnDeque->erase(it);
+        break;
       }
     }
   }
+  //printf("released\n");
 }
 
 LockMode LockManagerD::Status(const Key& key, vector<Txn*>* owners) {
