@@ -2,7 +2,6 @@
 // Modified by: Christina Wallin (christina.wallin@yale.edu)
 // Modified by: Kun Ren (kun.ren@yale.edu)
 
-
 #include "txn/txn_processor.h"
 #include <stdio.h>
 #include <set>
@@ -12,6 +11,8 @@
 
 // Thread & queue counts for StaticThreadPool initialization.
 #define THREAD_COUNT 8
+
+using namespace std;
 
 TxnProcessor::TxnProcessor(CCMode mode)
     : mode_(mode), tp_(THREAD_COUNT), next_unique_id_(1) {
@@ -182,109 +183,217 @@ Key *TxnProcessor::KeySorter(set<Key>* set) {
   return sorted;
 }
 
-// deque TxnProcessor::Merge(Key * reads, Key * writes) {
 
+vector<pair<Key, bool>> TxnProcessor::KeySorter2(set<Key>* rset, set<Key>* wset) {
+  int rlen = rset->size();
+  int wlen = wset->size();
 
-//   for (int i = 0; i < total i++) {
+  vector<pair<Key, bool>> setVector;
 
-//   }
+  if (rlen != 0) {
+    std::set<Key>::iterator it = rset->begin();
+    for (; it != rset->end(); ++it) {
+      setVector.push_back(make_pair(*it, false));
+    }
+  }
 
-// }
+  if (wlen != 0) {
+    std::set<Key>::iterator it = wset->begin();
+    for (; it != wset->end(); ++it) {
+      setVector.push_back(make_pair(*it, true));
+    }
+  }
+
+  uint64_t i, j, lowest;
+  for (i = 0; i < setVector.size() - 1; ++i) {
+    lowest = i;
+    for (j = i; j < setVector.size(); ++j) {
+      if (setVector[j].first < setVector[lowest].first) {
+        lowest = j;
+      }
+    }
+    pair<Key, bool> temp = setVector[i];
+    setVector[i] = setVector[lowest];
+    setVector[lowest] = temp;
+  }
+
+  return setVector;
+}
+
 
 void TxnProcessor::StartTwoExecuting(Txn *txn) {
   uint64_t i;
-  Key *sortedReadset = KeySorter(&(txn->readset_));
-  for (i = 0; i < txn->readset_.size(); ++i) {
-    Key current = sortedReadset[i];
+  vector<pair<Key, bool>> setVector = KeySorter2(&(txn->readset_), &(txn->writeset_));
 
-    while (!lm_->ReadLock(txn, current)) {
-      //continue;
-      sleep(1); // adjust this if necessary
-    }
+  for (i = 0; i < setVector.size(); ++i) {
+    Key current = setVector[i].first;
+    bool isWrite = setVector[i].second;
 
-    if (txn->data_type_ == 1) {
-      Value result;
-      if (storage_->Read(current, &result))
-        txn->reads_[current] = result;
-    }
-    else if (txn->data_type_ == 2) {
-      Image result;
-      if (storage_->ReadImage(current, &result))
-        txn->readsIMG_[current] = result;
-    }
-    else if (txn->data_type_ == 3) {
-      String result;
-      if (storage_->ReadString(current, &result))
-        txn->readsSTR_[current] = result;
-    }
-    else if (txn->data_type_ == 4) {
-      BlogString result;
-      if (storage_->ReadBlogString(current, &result))
-        txn->readsBSTR_[current] = result;
+    if (!isWrite) {
+      while (!lm_->ReadLock(txn, current)) {
+        //continue;
+        sleep(1); // adjust this if necessary
+      }
+
+      if (txn->data_type_ == 1) {
+        Value result;
+        if (storage_->Read(current, &result))
+          txn->reads_[current] = result;
+      }
+      else if (txn->data_type_ == 2) {
+        Image result;
+        if (storage_->ReadImage(current, &result))
+          txn->readsIMG_[current] = result;
+      }
+      else if (txn->data_type_ == 3) {
+        String result;
+        if (storage_->ReadString(current, &result))
+          txn->readsSTR_[current] = result;
+      }
+      else if (txn->data_type_ == 4) {
+        BlogString result;
+        if (storage_->ReadBlogString(current, &result))
+          txn->readsBSTR_[current] = result;
+      }
+    } else {
+      while (!lm_->WriteLock(txn, current)) {
+        //continue;
+        sleep(1); // adjust this if necessary
+      }
+
+      if (txn->data_type_ == 1) {
+        Value result;
+        if (storage_->Read(current, &result)) {
+          txn->writes_[current] = result;
+        }
+
+        storage_->Write(current, result, txn->unique_id_);
+      }
+      else if (txn->data_type_ == 2) {
+        Image result;
+        if (storage_->ReadImage(current, &result)) {
+          txn->readsIMG_[current] = result;
+        }
+
+        storage_->WriteImage(current, result, txn->unique_id_);
+      }
+      else if (txn->data_type_ == 3) {
+        String result;
+        if (storage_->ReadString(current, &result)) {
+          txn->readsSTR_[current] = result;
+        }
+
+        storage_->WriteString(current, result, txn->unique_id_);
+      }
+      else if (txn->data_type_ == 4) {
+        BlogString result;
+        if (storage_->ReadBlogString(current, &result)) {
+          txn->readsBSTR_[current] = result;
+        }
+
+        storage_->WriteBlogString(current, result, txn->unique_id_);
+      }
     }
   }
 
-  free(sortedReadset);
+  //Key *sortedReadset = KeySorter(&(txn->readset_));
+  //for (i = 0; i < txn->readset_.size(); ++i) {
+  //  Key current = sortedReadset[i];
 
-  Key *sortedWriteset = KeySorter(&(txn->writeset_));
+  //  while (!lm_->ReadLock(txn, current)) {
+  //    //continue;
+  //    sleep(1); // adjust this if necessary
+  //  }
 
-  for (i = 0; i < txn->writeset_.size(); ++i) {
-    Key current = sortedWriteset[i];
-    while (!lm_->WriteLock(txn, current)) {
-      //continue;
-      sleep(1); // adjust this if necessary
-    }
+  //  if (txn->data_type_ == 1) {
+  //    Value result;
+  //    if (storage_->Read(current, &result))
+  //      txn->reads_[current] = result;
+  //  }
+  //  else if (txn->data_type_ == 2) {
+  //    Image result;
+  //    if (storage_->ReadImage(current, &result))
+  //      txn->readsIMG_[current] = result;
+  //  }
+  //  else if (txn->data_type_ == 3) {
+  //    String result;
+  //    if (storage_->ReadString(current, &result))
+  //      txn->readsSTR_[current] = result;
+  //  }
+  //  else if (txn->data_type_ == 4) {
+  //    BlogString result;
+  //    if (storage_->ReadBlogString(current, &result))
+  //      txn->readsBSTR_[current] = result;
+  //  }
+  //}
 
-    if (txn->data_type_ == 1) {
-      Value result;
-      if (storage_->Read(current, &result)) {
-        txn->writes_[current] = result;
-      }
+  //free(sortedReadset);
 
-      storage_->Write(current, result, txn->unique_id_);
-    }
-    else if (txn->data_type_ == 2) {
-      Image result;
-      if (storage_->ReadImage(current, &result)) {
-        txn->readsIMG_[current] = result;
-      }
+  //Key *sortedWriteset = KeySorter(&(txn->writeset_));
 
-      storage_->WriteImage(current, result, txn->unique_id_);
-    }
-    else if (txn->data_type_ == 3) {
-      String result;
-      if (storage_->ReadString(current, &result)) {
-        txn->readsSTR_[current] = result;
-      }
+  //for (i = 0; i < txn->writeset_.size(); ++i) {
+  //  Key current = sortedWriteset[i];
+  //  while (!lm_->WriteLock(txn, current)) {
+  //    //continue;
+  //    sleep(1); // adjust this if necessary
+  //  }
 
-      storage_->WriteString(current, result, txn->unique_id_);
-    }
-    else if (txn->data_type_ == 4) {
-      BlogString result;
-      if (storage_->ReadBlogString(current, &result)) {
-        txn->readsBSTR_[current] = result;
-      }
+  //  if (txn->data_type_ == 1) {
+  //    Value result;
+  //    if (storage_->Read(current, &result)) {
+  //      txn->writes_[current] = result;
+  //    }
 
-      storage_->WriteBlogString(current, result, txn->unique_id_);
-    }
-  }
+  //    storage_->Write(current, result, txn->unique_id_);
+  //  }
+  //  else if (txn->data_type_ == 2) {
+  //    Image result;
+  //    if (storage_->ReadImage(current, &result)) {
+  //      txn->readsIMG_[current] = result;
+  //    }
 
-  free(sortedWriteset);
+  //    storage_->WriteImage(current, result, txn->unique_id_);
+  //  }
+  //  else if (txn->data_type_ == 3) {
+  //    String result;
+  //    if (storage_->ReadString(current, &result)) {
+  //      txn->readsSTR_[current] = result;
+  //    }
+
+  //    storage_->WriteString(current, result, txn->unique_id_);
+  //  }
+  //  else if (txn->data_type_ == 4) {
+  //    BlogString result;
+  //    if (storage_->ReadBlogString(current, &result)) {
+  //      txn->readsBSTR_[current] = result;
+  //    }
+
+  //    storage_->WriteBlogString(current, result, txn->unique_id_);
+  //  }
+  //}
+
+  //free(sortedWriteset);
 
   // Execute txn's program logic.
   txn->Run();
 
   // shrinking phase
-  for (i = 0; i < txn->readset_.size(); ++i) {
-    Key current = sortedReadset[i];
+  for (i = 0; i < setVector.size(); ++i) {
+    Key current = setVector[i].first;
     lm_->Release(txn, current);
   }
 
-  // Release write locks.
-  for (set<Key>::iterator it = txn->writeset_.begin();
-       it != txn->writeset_.end(); ++it) {
-    lm_->Release(txn, *it);
-  }
+  // shrinking phase
+  //for (i = 0; i < txn->readset_.size(); ++i) {
+  //  Key current = sortedReadset[i];
+  //  lm_->Release(txn, current);
+  //}
+
+  //// Release write locks.
+  //for (set<Key>::iterator it = txn->writeset_.begin();
+  //     it != txn->writeset_.end(); ++it) {
+  //  lm_->Release(txn, *it);
+  //}
 
   // Return result to client.
   txn_results_.Push(txn);

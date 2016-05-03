@@ -8,6 +8,7 @@
 #include <deque>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "txn/common.h"
 #include "txn/lock_manager.h"
@@ -75,6 +76,7 @@ class TxnProcessor {
 
   
   Key* KeySorter(set<Key>* set);
+  vector<pair<Key, bool>> KeySorter2(set<Key>* rset, set<Key>* wset);
 
   // Serial validation
   bool SerialValidate(Txn *txn);

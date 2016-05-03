@@ -189,7 +189,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
       mode <= SILO;
       mode = static_cast<CCMode>(mode+1)) {
 
-    if (mode != 0){
+    if (mode != 8){
       continue;
     }
 
@@ -404,31 +404,31 @@ int main(int argc, char** argv) {
 
   // TESTING IF WE CAN HAVE SMALL WRITE SET WITH READ SET
 
-  // cout << "'Low contention to high contention' Read + Write (7 records)" << endl;
-  // lg.push_back(new RMWLoadGenFB(1000, 5, 2, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(800, 5, 2, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(600, 5, 2, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(400, 5, 2, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(200, 5, 2, 0.0001));
+  cout << "'Low contention to high contention' Read + Write (6 records)" << endl;
+  lg.push_back(new RMWLoadGenFB(1000, 5, 1, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 5, 1, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 5, 1, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 5, 1, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 5, 1, 0.0001));
 
-  // Benchmark(lg);
+  Benchmark(lg);
 
-  // for (uint32 i = 0; i < lg.size(); i++)
-  //   delete lg[i];
-  // lg.clear();
+  for (uint32 i = 0; i < lg.size(); i++)
+    delete lg[i];
+  lg.clear();
 
-  // cout << "'Low contention to high contention' Read only (23 records)" << endl;
-  // lg.push_back(new RMWLoadGenFB(1000, 20, 3, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(800, 20, 3, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(600, 20, 3, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(400, 20, 3, 0.0001));
-  // lg.push_back(new RMWLoadGenFB(200, 20, 3, 0.0001));
+  cout << "'Low contention to high contention' Read only (23 records)" << endl;
+  lg.push_back(new RMWLoadGenFB(1000, 20, 3, 0.0001));
+  lg.push_back(new RMWLoadGenFB(800, 20, 3, 0.0001));
+  lg.push_back(new RMWLoadGenFB(600, 20, 3, 0.0001));
+  lg.push_back(new RMWLoadGenFB(400, 20, 3, 0.0001));
+  lg.push_back(new RMWLoadGenFB(200, 20, 3, 0.0001));
 
-  // Benchmark(lg);
+  Benchmark(lg);
 
-  // for (uint32 i = 0; i < lg.size(); i++)
-  //   delete lg[i];
-  // lg.clear();
+  for (uint32 i = 0; i < lg.size(); i++)
+    delete lg[i];
+  lg.clear();
 
 
   // DONE WITH TEST
