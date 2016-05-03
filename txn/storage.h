@@ -48,6 +48,7 @@ class Storage {
   virtual void InitImageStorage();
 
 
+
   // modified code for strings
 
   virtual bool ReadString(Key key, String* result, int txn_unique_id = 0);
@@ -69,7 +70,7 @@ class Storage {
 
 
   
-  virtual ~Storage() {}
+  virtual ~Storage();
   
   // The following methods are only used for MVCC
   virtual void Lock(Key key) {}

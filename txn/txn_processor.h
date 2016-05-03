@@ -35,6 +35,7 @@ enum CCMode {
   MVCC = 5,
   TWOPL = 6,                     // Final Project 2PL
   TWOPL2 = 7,
+  SILO = 8,
 };
 
 // Returns a human-readable string naming of the providing mode.
@@ -60,17 +61,26 @@ class TxnProcessor {
 
   // Main loop implementing all concurrency control/thread scheduling.
   void RunScheduler();
+
   
   static void* StartScheduler(void * arg);
   
  private:
+
+  // Parallel execution/validation for OCC
+  void ExecuteTxnParallel(Txn *txn);
+  void ExecuteTxnImageParallel(Txn *txn);
+  void ExecuteTxnStringParallel(Txn *txn);
+  void ExecuteTxnBlogStringParallel(Txn *txn);
+
+  
   Key* KeySorter(set<Key>* set);
 
   // Serial validation
   bool SerialValidate(Txn *txn);
 
   // Parallel executtion/validation for OCC
-  void ExecuteTxnParallel(Txn *txn);
+  // void ExecuteTxnParallel(Txn *txn);
 
   // Serial version of scheduler.
   void RunSerialScheduler();
@@ -176,4 +186,4 @@ class TxnProcessor {
 
 #endif  // _TXN_PROCESSOR_H_
 
-
+ 

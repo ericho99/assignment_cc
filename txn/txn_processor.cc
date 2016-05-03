@@ -23,6 +23,8 @@ TxnProcessor::TxnProcessor(CCMode mode)
     lm_ = new LockManagerC(&ready_txns_);
   else if (mode == TWOPL2)
     lm_ = new LockManagerD(&ready_txns_);
+  else if (mode == SILO)
+    lm_ = new LockManagerD(&ready_txns_);
   
   // Create the storage
   if (mode_ == MVCC) {
@@ -96,6 +98,7 @@ void TxnProcessor::RunScheduler() {
     case MVCC:                   RunMVCCScheduler(); break;
     case TWOPL:                  RunLockingSchedulerTwo(); break;
     case TWOPL2:                 RunTwoScheduler(); break;
+    case SILO:                   RunOCCParallelScheduler(); break;
   }
 }
 
@@ -178,6 +181,15 @@ Key *TxnProcessor::KeySorter(set<Key>* set) {
 
   return sorted;
 }
+
+// deque TxnProcessor::Merge(Key * reads, Key * writes) {
+
+
+//   for (int i = 0; i < total i++) {
+
+//   }
+
+// }
 
 void TxnProcessor::StartTwoExecuting(Txn *txn) {
   uint64_t i;
@@ -847,6 +859,643 @@ void TxnProcessor::RunOCCScheduler() {
   }
 }
 
+void TxnProcessor::ExecuteTxnParallel(Txn *txn) {
+    // Get the start time
+  txn->occ_start_time_ = GetTime();
+ 
+ 
+  bool blocked = false;
+  // Request write locks.
+    for (set<Key>::iterator it = txn->writeset_.begin();
+             it != txn->writeset_.end(); ++it) {
+      if (!lm_->WriteLock(txn, *it)) {
+        blocked = true;
+        // If writeset_.size() > 1, and blocked, just abort
+        if (txn->writeset_.size() > 1) {
+          // Release all write locks that already acquired
+          for (set<Key>::iterator it_writes = txn->writeset_.begin(); true; ++it_writes) {
+            lm_->Release(txn, *it_writes);
+            if (it_writes == it) {
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+ 
+      // If all write locks were immediately acquired, this txn is
+      // ready to be executed. Else, just restart the txn
+      /*if (blocked == false) {
+    if (lm_->ReadyExecute(txn)) {
+      ready_txns_.push_back(txn);
+    }
+      } else */if (blocked == true && (txn->writeset_.size() > 1)){
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+    return;
+      }
+
+ 
+  // Key *sortedWriteset = KeySorter(&(txn->writeset_));
+ 
+  // for (uint64_t i = 0; i < txn->writeset_.size(); ++i) {
+  //   Key current = sortedWriteset[i];
+  //   while (!lm_->WriteLock(txn, current)) {
+  //     //continue;
+  //     sleep(1); // adjust this if necessary
+  //   }
+  // }
+
+  // free(sortedWriteset);
+ 
+  // Read everything in from readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+       it != txn->readset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    Value result;
+    if (storage_->Read(*it, &result))
+      txn->reads_[*it] = result;
+  }
+ 
+  // Read everything in from writeset
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    Value result;
+    if (storage_->Read(*it, &result))
+      txn->reads_[*it] = result;
+  }
+ 
+  // Execute txn's program logic.
+  txn->Run();
+ 
+  // critical section
+  // creates copy of active set and inserts the transaction
+  active_set_mutex_.Lock();
+  set<Txn *> active_set_copy_ = active_set_.GetSet();
+  active_set_.Insert(txn);
+  active_set_mutex_.Unlock();
+ 
+  bool validTxn = true;
+  // Check times readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+      it != txn->readset_.end(); ++it) {
+    if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+      validTxn = false;
+      break;
+    }
+  }
+ 
+  /********************
+  ** Don't need this part because writes are locked
+ 
+  // Also read everything in from writeset.
+  if (validTxn) {
+    for (set<Key>::iterator it = txn->writeset_.begin();
+        it != txn->writeset_.end(); ++it) {
+      if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+        validTxn = false;
+        break;
+      }
+    }
+  }
+ 
+ *********************/
+ 
+  // check all transactions in active set for overlaps
+  if (validTxn) {
+    for (set<Txn *>::iterator it = active_set_copy_.begin();
+        it != active_set_copy_.end(); ++it) {
+      if (txn->data_type_ == (*it)->data_type_) {
+        // check readset of each transaction
+        for (set<Key>::iterator txnIt = (*it)->writeset_.begin();
+            txnIt != (*it)->writeset_.end(); ++txnIt) {
+          if (txn->readset_.count(*txnIt) > 0) {
+            validTxn = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+ 
+  if (validTxn) {
+    // apply writes
+    ApplyWrites(txn);
+ 
+    // remove from active set (check if I need to obtain a lock on the entire active set table)
+    active_set_.Erase(txn);
+   
+    // update commit status
+    txn->status_ = COMMITTED;
+ 
+    // Return result to client.
+    txn_results_.Push(txn);
+  } else {
+    // remove from active set
+    active_set_.Erase(txn);
+ 
+    // cleanup txn
+    txn->reads_.clear();
+    txn->writes_.clear();
+    txn->status_ = INCOMPLETE;
+ 
+    // restart txn
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+  }
+
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+
+}
+ 
+void TxnProcessor::ExecuteTxnImageParallel(Txn *txn) {
+    // Get the start time
+  txn->occ_start_time_ = GetTime();
+ 
+
+  bool blocked = false;
+  // Request write locks.
+    for (set<Key>::iterator it = txn->writeset_.begin();
+             it != txn->writeset_.end(); ++it) {
+      if (!lm_->WriteLock(txn, *it)) {
+        blocked = true;
+        // If writeset_.size() > 1, and blocked, just abort
+        if (txn->writeset_.size() > 1) {
+          // Release all write locks that already acquired
+          for (set<Key>::iterator it_writes = txn->writeset_.begin(); true; ++it_writes) {
+            lm_->Release(txn, *it_writes);
+            if (it_writes == it) {
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+ 
+      // If all write locks were immediately acquired, this txn is
+      // ready to be executed. Else, just restart the txn
+      /*if (blocked == false) {
+    if (lm_->ReadyExecute(txn)) {
+          std::cout << "check" << std::endl;
+      ready_txns_.push_back(txn);
+    }
+      } else */if (blocked == true && (txn->writeset_.size() > 1)){
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+    return;
+      }
+
+ 
+  // Key *sortedWriteset = KeySorter(&(txn->writeset_));
+ 
+  // for (uint64_t i = 0; i < txn->writeset_.size(); ++i) {
+  //   Key current = sortedWriteset[i];
+  //   while (!lm_->WriteLock(txn, current)) {
+  //     //continue;
+  //     sleep(1); // adjust this if necessary
+  //   }
+ 
+  // }
+
+  // free(sortedWriteset);
+ 
+  // Read everything in from readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+       it != txn->readset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    Image result;
+    if (storage_->ReadImage(*it, &result))
+      txn->readsIMG_[*it] = result;
+  }
+ 
+  // Read everything in from writeset
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    Image result;
+    if (storage_->ReadImage(*it, &result))
+      txn->readsIMG_[*it] = result;
+  }
+ 
+  // Execute txn's program logic.
+  txn->Run();
+ 
+  // critical section
+  // creates copy of active set and inserts the transaction
+  active_set_mutex_.Lock();
+  set<Txn *> active_set_copy_ = active_set_.GetSet();
+  active_set_.Insert(txn);
+  active_set_mutex_.Unlock();
+ 
+  bool validTxn = true;
+  // Check times readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+      it != txn->readset_.end(); ++it) {
+    if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+      validTxn = false;
+      break;
+    }
+  }
+ 
+  /********************
+  ** Don't need this part because writes are locked
+ 
+  // Also read everything in from writeset.
+  if (validTxn) {
+    for (set<Key>::iterator it = txn->writeset_.begin();
+        it != txn->writeset_.end(); ++it) {
+      if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+        validTxn = false;
+        break;
+      }
+    }
+  }
+ 
+ *********************/
+ 
+  // check all transactions in active set for overlaps
+  if (validTxn) {
+    for (set<Txn *>::iterator it = active_set_copy_.begin();
+        it != active_set_copy_.end(); ++it) {
+      if (txn->data_type_ == (*it)->data_type_) {
+        // check readset of each transaction
+        for (set<Key>::iterator txnIt = (*it)->writeset_.begin();
+            txnIt != (*it)->writeset_.end(); ++txnIt) {
+          if (txn->readset_.count(*txnIt) > 0) {
+            validTxn = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+ 
+  if (validTxn) {
+    // apply writes
+    ApplyImageWrites(txn);
+ 
+    // remove from active set (check if I need to obtain a lock on the entire active set table)
+    active_set_.Erase(txn);
+   
+    // update commit status
+    txn->status_ = COMMITTED;
+ 
+    // Return result to client.
+    txn_results_.Push(txn);
+  } else {
+    // remove from active set
+    active_set_.Erase(txn);
+ 
+    // cleanup txn
+    txn->reads_.clear();
+    txn->writes_.clear();
+    txn->status_ = INCOMPLETE;
+ 
+    // restart txn
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+  }
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+}
+ 
+void TxnProcessor::ExecuteTxnStringParallel(Txn *txn) {
+    // Get the start time
+  txn->occ_start_time_ = GetTime();
+ 
+
+  bool blocked = false;
+  // Request write locks.
+    for (set<Key>::iterator it = txn->writeset_.begin();
+             it != txn->writeset_.end(); ++it) {
+      if (!lm_->WriteLock(txn, *it)) {
+        blocked = true;
+        // If writeset_.size() > 1, and blocked, just abort
+        if (txn->writeset_.size() > 1) {
+          // Release all write locks that already acquired
+          for (set<Key>::iterator it_writes = txn->writeset_.begin(); true; ++it_writes) {
+            lm_->Release(txn, *it_writes);
+            if (it_writes == it) {
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+ 
+      // If all write locks were immediately acquired, this txn is
+      // ready to be executed. Else, just restart the txn
+      /*if (blocked == false) {
+    if (lm_->ReadyExecute(txn)) {
+      ready_txns_.push_back(txn);
+    }
+      } else */if (blocked == true && (txn->writeset_.size() > 1)){
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+    return;
+      }
+
+ 
+  // Key *sortedWriteset = KeySorter(&(txn->writeset_));
+ 
+  // for (uint64_t i = 0; i < txn->writeset_.size(); ++i) {
+  //   Key current = sortedWriteset[i];
+  //   while (!lm_->WriteLock(txn, current)) {
+  //     //continue;
+  //     sleep(1); // adjust this if necessary
+  //   }
+  // }
+
+  // free(sortedWriteset);
+ 
+  // Read everything in from readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+       it != txn->readset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    String result;
+    if (storage_->ReadString(*it, &result))
+      txn->readsSTR_[*it] = result;
+  }
+ 
+  // Read everything in from writeset
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    String result;
+    if (storage_->ReadString(*it, &result))
+      txn->readsSTR_[*it] = result;
+  }
+ 
+  // Execute txn's program logic.
+  txn->Run();
+ 
+  // critical section
+  // creates copy of active set and inserts the transaction
+  active_set_mutex_.Lock();
+  set<Txn *> active_set_copy_ = active_set_.GetSet();
+  active_set_.Insert(txn);
+  active_set_mutex_.Unlock();
+ 
+  bool validTxn = true;
+  // Check times readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+      it != txn->readset_.end(); ++it) {
+    if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+      validTxn = false;
+      break;
+    }
+  }
+ 
+  /********************
+  ** Don't need this part because writes are locked
+ 
+  // Also read everything in from writeset.
+  if (validTxn) {
+    for (set<Key>::iterator it = txn->writeset_.begin();
+        it != txn->writeset_.end(); ++it) {
+      if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+        validTxn = false;
+        break;
+      }
+    }
+  }
+ 
+ *********************/
+ 
+  // check all transactions in active set for overlaps
+  if (validTxn) {
+    for (set<Txn *>::iterator it = active_set_copy_.begin();
+        it != active_set_copy_.end(); ++it) {
+      if (txn->data_type_ == (*it)->data_type_) {
+        // check readset of each transaction
+        for (set<Key>::iterator txnIt = (*it)->writeset_.begin();
+            txnIt != (*it)->writeset_.end(); ++txnIt) {
+          if (txn->readset_.count(*txnIt) > 0) {
+            validTxn = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+ 
+  if (validTxn) {
+    // apply writes
+    ApplyStringWrites(txn);
+ 
+    // remove from active set (check if I need to obtain a lock on the entire active set table)
+    active_set_.Erase(txn);
+   
+    // update commit status
+    txn->status_ = COMMITTED;
+ 
+    // Return result to client.
+    txn_results_.Push(txn);
+  } else {
+    // remove from active set
+    active_set_.Erase(txn);
+ 
+    // cleanup txn
+    txn->reads_.clear();
+    txn->writes_.clear();
+    txn->status_ = INCOMPLETE;
+ 
+    // restart txn
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+  }
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+}
+ 
+void TxnProcessor::ExecuteTxnBlogStringParallel(Txn *txn) {
+    // Get the start time
+  txn->occ_start_time_ = GetTime();
+ 
+
+  bool blocked = false;
+  // Request write locks.
+    for (set<Key>::iterator it = txn->writeset_.begin();
+             it != txn->writeset_.end(); ++it) {
+      if (!lm_->WriteLock(txn, *it)) {
+        blocked = true;
+        // If writeset_.size() > 1, and blocked, just abort
+        if (txn->writeset_.size() > 1) {
+          // Release all write locks that already acquired
+          for (set<Key>::iterator it_writes = txn->writeset_.begin(); true; ++it_writes) {
+            lm_->Release(txn, *it_writes);
+            if (it_writes == it) {
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+ 
+      // If all write locks were immediately acquired, this txn is
+      // ready to be executed. Else, just restart the txn
+      /*if (blocked == false) {
+    if (lm_->ReadyExecute(txn)) {
+      ready_txns_.push_back(txn);
+    }
+      } else */if (blocked == true && (txn->writeset_.size() > 1)){
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+    return;
+      }
+
+ 
+  // Key *sortedWriteset = KeySorter(&(txn->writeset_));
+ 
+  // for (uint64_t i = 0; i < txn->writeset_.size(); ++i) {
+  //   Key current = sortedWriteset[i];
+  //   while (!lm_->WriteLock(txn, current)) {
+  //     //continue;
+  //     sleep(1); // adjust this if necessary
+  //   }
+  // }
+
+  // free(sortedWriteset);
+ 
+  // Read everything in from readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+       it != txn->readset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    BlogString result;
+    if (storage_->ReadBlogString(*it, &result))
+      txn->readsBSTR_[*it] = result;
+  }
+ 
+  // Read everything in from writeset
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    // Save each read result iff record exists in storage.
+    BlogString result;
+    if (storage_->ReadBlogString(*it, &result))
+      txn->readsBSTR_[*it] = result;
+  }
+ 
+  // Execute txn's program logic.
+  txn->Run();
+ 
+  // critical section
+  // creates copy of active set and inserts the transaction
+  active_set_mutex_.Lock();
+  set<Txn *> active_set_copy_ = active_set_.GetSet();
+  active_set_.Insert(txn);
+  active_set_mutex_.Unlock();
+ 
+  bool validTxn = true;
+  // Check times readset.
+  for (set<Key>::iterator it = txn->readset_.begin();
+      it != txn->readset_.end(); ++it) {
+    if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+      validTxn = false;
+      break;
+    }
+  }
+ 
+  /********************
+  ** Don't need this part because writes are locked
+ 
+  // Also read everything in from writeset.
+  if (validTxn) {
+    for (set<Key>::iterator it = txn->writeset_.begin();
+        it != txn->writeset_.end(); ++it) {
+      if (storage_->Timestamp(*it) > txn->occ_start_time_) {
+        validTxn = false;
+        break;
+      }
+    }
+  }
+ 
+ *********************/
+ 
+  // check all transactions in active set for overlaps
+  if (validTxn) {
+    for (set<Txn *>::iterator it = active_set_copy_.begin();
+        it != active_set_copy_.end(); ++it) {
+      if (txn->data_type_ == (*it)->data_type_) {
+        // check readset of each transaction
+        for (set<Key>::iterator txnIt = (*it)->writeset_.begin();
+            txnIt != (*it)->writeset_.end(); ++txnIt) {
+          if (txn->readset_.count(*txnIt) > 0) {
+            validTxn = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+ 
+  if (validTxn) {
+    // apply writes
+    ApplyBlogStringWrites(txn);
+ 
+    // remove from active set (check if I need to obtain a lock on the entire active set table)
+    active_set_.Erase(txn);
+   
+    // update commit status
+    txn->status_ = COMMITTED;
+ 
+    // Return result to client.
+    txn_results_.Push(txn);
+  } else {
+    // remove from active set
+    active_set_.Erase(txn);
+ 
+    // cleanup txn
+    txn->reads_.clear();
+    txn->writes_.clear();
+    txn->status_ = INCOMPLETE;
+ 
+    // restart txn
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock();
+  }
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
+}
+
+ 
 void TxnProcessor::RunOCCParallelScheduler() {
   // CPSC 438/538:
   //
@@ -858,8 +1507,37 @@ void TxnProcessor::RunOCCParallelScheduler() {
   //
   // [For now, run serial scheduler in order to make it through the test
   // suite]
-  RunSerialScheduler();
+ 
+  Txn* txn;
+  while (tp_.Active()) {
+    // Get next txn request.
+    if (txn_requests_.Pop(&txn)) {
+      // Start txn running in its own thread.
+      if(txn->data_type_ == 1) {
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+              this,
+              &TxnProcessor::ExecuteTxnParallel,
+              txn));
+      } else if(txn->data_type_ == 2) {
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+              this,
+              &TxnProcessor::ExecuteTxnImageParallel,
+              txn));
+      } else if(txn->data_type_ == 3) {
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+              this,
+              &TxnProcessor::ExecuteTxnStringParallel,
+              txn));
+      } else if(txn->data_type_ == 4) {
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+              this,
+              &TxnProcessor::ExecuteTxnBlogStringParallel,
+              txn));
+      }
+    }
+  }
 }
+
 
 void TxnProcessor::RunMVCCScheduler() {
   // CPSC 438/538:
@@ -873,3 +1551,6 @@ void TxnProcessor::RunMVCCScheduler() {
   // suite]
   RunSerialScheduler();
 }
+
+
+

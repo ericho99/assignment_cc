@@ -3,6 +3,14 @@
 
 #include "txn/storage.h"
 
+Storage::~Storage() {
+  // data_.~unordered_map();
+  // images_.~unordered_map();
+  // strings_.~unordered_map();
+  // blog_strings_.~unordered_map();
+  // timestamps_.~unordered_map();
+}
+
 bool Storage::Read(Key key, Value* result, int txn_unique_id) {
   if (data_.count(key)) {
     *result = data_[key];
