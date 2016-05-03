@@ -19,6 +19,8 @@
 #include "utils/mutex.h"
 #include "utils/condition.h"
 
+#include <algorithm>
+
 
 using std::deque;
 using std::map;
@@ -124,6 +126,8 @@ class TxnProcessor {
   void MVCCUnlockWriteKeys(Txn* txn);
   
   void GarbageCollection();
+
+  Key * KeySorter(set<Key>* set);
   
   // Concurrency control mechanism the TxnProcessor is currently using.
   CCMode mode_;
@@ -166,4 +170,5 @@ class TxnProcessor {
 };
 
 #endif  // _TXN_PROCESSOR_H_
+
 

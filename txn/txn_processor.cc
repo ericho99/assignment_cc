@@ -443,6 +443,30 @@ void TxnProcessor::RunLockingScheduler() {
   }
 }
 
+Key * TxnProcessor::KeySorter(set<Key>* set) {
+  int len = set->size();
+  Key* sorted;
+  sorted = (Key *) malloc(len * sizeof(Key));
+  int i = 0;
+  std::set<Key>::iterator it = set->begin();
+  for (; it != set->end(); ++it) {
+    sorted[i] = *it;
+    i++;
+  }
+
+  for (int x = 0; x < len - 1; x++) {
+    for (int y = 1; y < len; y++) {
+      if (x < y) {
+        Key temp = sorted[x];
+        sorted[x] = sorted[y];
+        sorted[y] = temp;
+      }
+    }
+  }
+
+  return sorted;
+}
+
 void TxnProcessor::ExecuteTxn(Txn* txn) {
 
   // Get the start time
