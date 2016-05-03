@@ -114,14 +114,8 @@ class LockManager {
   // txn.
   unordered_map<Txn*, int> txn_waits_;
 
-  // table of pthread locks for each key in lock table
-  unordered_map<Key, pthread_mutex_t> mutex_table_;
-
   // locks the whole lock table
   pthread_mutex_t lock_table_lock_; 
-
-  // locks the pthread mutex table
-  pthread_mutex_t mutex_table_lock_;
 };
 
 // Version of the LockManager implementing ONLY exclusive locks.

@@ -97,7 +97,6 @@ class RMW : public Txn {
 
     data_type_ = data_type;
 
-    // printf("dbsize is %d\n", dbsize);
     // if (data_type == 1) {
     //   dbsize = dbsize;
     // }
@@ -110,6 +109,7 @@ class RMW : public Txn {
     // else {
     //   dbsize = 100;
     // }
+
 
     // Find readsetsize unique read keys.
     for (int i = 0; i < readsetsize; i++) {

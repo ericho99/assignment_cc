@@ -9,52 +9,28 @@
 
 LockManagerD::LockManagerD(deque<Txn*>* ready_txns) {
   ready_txns_ = ready_txns;
+  pthread_mutex_init(&lock_table_lock_, NULL);
 }
 
 bool LockManagerD::WriteLock(Txn* txn, const Key& key) {
   // CPSC 438/538:
   //
   // Implement this method!
-  //
-  printf("getting a write...which is bad\n");
 
+  pthread_mutex_lock(&lock_table_lock_);
   // find the key in the lock table
   unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
   if (it == lock_table_.end()) {
-    pthread_mutex_lock(&lock_table_lock_);
-
-    // case where someone adds in same key since it acquired lock
-    unordered_map<Key, deque<LockRequest>*>::const_iterator it2 = lock_table_.find(key);
-    if (it2 != lock_table_.end()) {
-      // unlocks the lock table
-      pthread_mutex_unlock(&lock_table_lock_);
-      return false;
-    }
-
     // create a deque at the key
     deque<LockRequest> *newTxnDeque = new deque<LockRequest>();
     LockRequest lr(EXCLUSIVE, txn);
     newTxnDeque->push_back(lr);
     lock_table_.insert({key, newTxnDeque});
 
-    // adds the new mutex lock for the key
-    pthread_mutex_lock(&mutex_table_lock_);
-    pthread_mutex_t mutex_lock;
-    mutex_table_.insert({key, mutex_lock});
-    pthread_mutex_unlock(&mutex_table_lock_);
-
     // unlocks the lock table
     pthread_mutex_unlock(&lock_table_lock_);
     return true;
   } else {
-    unordered_map<Key, pthread_mutex_t>::const_iterator it2 = mutex_table_.find(key);
-    if (it2 == mutex_table_.end()) {
-      return false;
-    }
-
-    pthread_mutex_t ml = mutex_table_[key];
-    pthread_mutex_lock(&ml);
-    
     deque<LockRequest> *txnDeque = it->second;
 
     // if it's the only transaction, then we grant the lock
@@ -62,11 +38,11 @@ bool LockManagerD::WriteLock(Txn* txn, const Key& key) {
       // push the transaction to the back of the deque
       LockRequest lr(EXCLUSIVE, txn);
       txnDeque->push_back(lr);
-      pthread_mutex_unlock(&ml);
+      pthread_mutex_unlock(&lock_table_lock_);
       return true;
     }
 
-    pthread_mutex_unlock(&ml);
+    pthread_mutex_unlock(&lock_table_lock_);
     return false;
   }
 }
@@ -76,52 +52,26 @@ bool LockManagerD::ReadLock(Txn* txn, const Key& key) {
   //
   // Implement this method!
   
-  pthread_mutex_lock(&lock_table_lock_);
   // find the key in the lock table
+  pthread_mutex_lock(&lock_table_lock_);
   unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
   if (it == lock_table_.end()) {
-    // case where someone adds in same key since it acquired lock
-    //unordered_map<Key, deque<LockRequest>*>::const_iterator it2 = lock_table_.find(key);
-    //if (it2 != lock_table_.end()) {
-    //  // unlocks the lock table
-    //  pthread_mutex_unlock(&lock_table_lock_);
-    //  printf("cant find it again\n");
-    //  return false;
-    //}
-
     // create a deque at the key
     deque<LockRequest> *newTxnDeque = new deque<LockRequest>();
     LockRequest lr(SHARED, txn);
     newTxnDeque->push_back(lr);
     lock_table_.insert({key, newTxnDeque});
 
-    // adds the new mutex lock for the key
-    pthread_mutex_lock(&mutex_table_lock_);
-    pthread_mutex_t mutex_lock;
-    mutex_table_.insert({key, mutex_lock});
-    pthread_mutex_unlock(&mutex_table_lock_);
-
     // unlocks the lock table
     pthread_mutex_unlock(&lock_table_lock_);
     return true;
   } else {
-    unordered_map<Key, pthread_mutex_t>::const_iterator it2 = mutex_table_.find(key);
-    if (it2 == mutex_table_.end()) {
-      printf("couldnt find mutex\n");
-      return false;
-    }
-
-    pthread_mutex_t ml = mutex_table_[key];
-    pthread_mutex_lock(&ml);
-    
     deque<LockRequest> *txnDeque = it->second;
 
     // stores whether there are only shared lock requests in the deque
     bool onlyShared = true;
     for (deque<LockRequest>::iterator dit = txnDeque->begin(); dit != txnDeque->end(); ++dit) {
       if (dit->mode_ != SHARED) {
-        printf("onlyshared is false\n");
-        printf("the mode is %d\n", dit->mode_);
         onlyShared = false;
         break;
       }
@@ -131,13 +81,10 @@ bool LockManagerD::ReadLock(Txn* txn, const Key& key) {
       // push the transaction to the back of the deque
       LockRequest lr(SHARED, txn);
       txnDeque->push_back(lr);
-      pthread_mutex_unlock(&ml);
-
       pthread_mutex_unlock(&lock_table_lock_);
       return true;
     }
 
-    pthread_mutex_unlock(&ml);
     pthread_mutex_unlock(&lock_table_lock_);
     return false;
   }
@@ -149,18 +96,12 @@ void LockManagerD::Release(Txn* txn, const Key& key) {
   // Implement this method!
 
   // find the deque
+  pthread_mutex_lock(&lock_table_lock_);
   unordered_map<Key, deque<LockRequest>*>::const_iterator it = lock_table_.find(key);
   if (it == lock_table_.end()){
+    pthread_mutex_unlock(&lock_table_lock_);
     return; 
   } else {
-    unordered_map<Key, pthread_mutex_t>::const_iterator it2 = mutex_table_.find(key);
-    if (it2 == mutex_table_.end()) {
-      return;
-    }
-
-    pthread_mutex_t ml = mutex_table_[key];
-    pthread_mutex_lock(&ml);
- 
     deque<LockRequest> *txnDeque = it->second;
     // iterate over elements of the deque to find the txn
     for (deque<LockRequest>::iterator it = txnDeque->begin(); it != txnDeque->end(); ++it) {
@@ -170,7 +111,7 @@ void LockManagerD::Release(Txn* txn, const Key& key) {
       }
     }
 
-    pthread_mutex_unlock(&ml);
+    pthread_mutex_unlock(&lock_table_lock_);
   }
 }
 
@@ -206,7 +147,6 @@ LockMode LockManagerD::Status(const Key& key, vector<Txn*>* owners) {
     } else if (sawShared) {
       return SHARED;
     } else {
-      printf("SHOULDNT GET HERE: ERROR\n");
       return UNLOCKED;
     }
   }
