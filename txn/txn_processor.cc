@@ -28,7 +28,12 @@ TxnProcessor::TxnProcessor(CCMode mode)
     storage_ = new Storage();
   }
   
+  // printf("in here\n");
   storage_->InitStorage();
+  storage_->InitImageStorage();
+  storage_->InitStringStorage();
+  storage_->InitBlogStringStorage();
+  // printf("got here\n");
 
   // Start 'RunScheduler()' running.
   cpu_set_t cpuset;
@@ -357,7 +362,18 @@ void TxnProcessor::RunLockingScheduler() {
     while (completed_txns_.Pop(&txn)) {
       // Commit/abort txn according to program logic's commit/abort decision.
       if (txn->Status() == COMPLETED_C) {
-        ApplyWrites(txn);
+        if (txn->data_type_ == 1){
+          ApplyWrites(txn);
+        }
+        else if (txn->data_type_ == 2){
+          ApplyImageWrites(txn);
+        }
+        else if (txn->data_type_ == 3){
+          ApplyStringWrites(txn);
+        }
+        else if (txn->data_type_ == 4){
+          ApplyBlogStringWrites(txn);
+        }
         txn->status_ = COMMITTED;
       } else if (txn->Status() == COMPLETED_A) {
         txn->status_ = ABORTED;
@@ -388,11 +404,40 @@ void TxnProcessor::RunLockingScheduler() {
       txn = ready_txns_.front();
       ready_txns_.pop_front();
 
-      // Start txn running in its own thread.
-      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+      if (txn->data_type_ == 1){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
             this,
             &TxnProcessor::ExecuteTxn,
             txn));
+      }
+      else if (txn->data_type_ == 2){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteImageTxn,
+            txn));
+      }
+      else if (txn->data_type_ == 3){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteStringTxn,
+            txn));
+      }
+      else if (txn->data_type_ == 4){
+        // Start txn running in its own thread.
+        tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteBlogStringTxn,
+            txn));
+      }
+      // Start txn running in its own thread.
+      // printf("this is the type: %d\n", txn->data_type_);
+      // tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+      //       this,
+      //       &TxnProcessor::ExecuteTxn,
+      //       txn));
 
     }
   }
@@ -553,7 +598,7 @@ void TxnProcessor::ApplyStringWrites(Txn* txn) {
   // Write buffered writes out to storage.
   for (map<Key, String>::iterator it = txn->writesSTR_.begin();
        it != txn->writesSTR_.end(); ++it) {
-    storage_->WriteString(it->first, it->second, txn->unique_id_);
+      storage_->WriteString(it->first, it->second, txn->unique_id_);
   }
 
 }
@@ -567,6 +612,21 @@ void TxnProcessor::ApplyBlogStringWrites(Txn* txn) {
 
 }
 
+void TxnProcessor::ExecuteOCCTxn(Txn* txn) {
+  if (txn->data_type_ == 1){
+    ExecuteTxn(txn);
+  }
+  else if (txn->data_type_ == 2){
+    ExecuteImageTxn(txn);
+  }
+  else if (txn->data_type_ == 3){
+    ExecuteStringTxn(txn);
+  }
+  else if (txn->data_type_ == 4){
+    ExecuteBlogStringTxn(txn);
+  }
+}
+
 void TxnProcessor::RunOCCScheduler() {
   // CPSC 438/538:
   //
@@ -575,7 +635,68 @@ void TxnProcessor::RunOCCScheduler() {
   // [For now, run serial scheduler in order to make it through the test
   // suite]
 
-  RunSerialScheduler();
+  Txn* txn;
+  bool validated;
+
+  while (tp_.Active()) {
+
+    //Get the next new transaction request (if one is pending) and pass it to an execution thread.
+    if (txn_requests_.Pop(&txn)) {
+      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
+            this,
+            &TxnProcessor::ExecuteOCCTxn,
+            txn));
+    }
+    
+    //Validation Phase:
+    // Process and commit all transactions that have finished running.
+    while (completed_txns_.Pop(&txn)) {
+      validated = true;
+
+      // check all writes of the record to make sure it doesn't conflict with the current txn's readset/writeset
+      for (set<Key>::iterator it = txn->writeset_.begin();
+        it != txn->writeset_.end(); ++it) {
+        if ((storage_->Timestamp(*it)) > (txn->occ_start_time_)) {
+          validated  = false;
+        }
+      }
+      for (set<Key>::iterator it = txn->readset_.begin();
+        it != txn->readset_.end(); ++it) {
+        if ((storage_->Timestamp(*it)) > (txn->occ_start_time_)) {
+          validated  = false;
+        }
+      }
+      // Commit/abort txn according to program logic's commit/abort decision.
+      if (validated) {
+        // ApplyWrites(txn); 
+        if (txn->data_type_ == 1){
+          ApplyWrites(txn);
+        }
+        else if (txn->data_type_ == 2){
+          ApplyImageWrites(txn);
+        }
+        else if (txn->data_type_ == 3){
+          ApplyStringWrites(txn);
+        }
+        else if (txn->data_type_ == 4){
+          ApplyBlogStringWrites(txn);
+        }
+        txn->status_ = COMMITTED;
+        txn_results_.Push(txn);
+      } else  {
+        // Cleanup txn
+        txn->reads_.clear();
+        txn->writes_.clear();
+        txn->status_ = INCOMPLETE;
+        // Completely restart the transaction.
+        mutex_.Lock();
+        txn->unique_id_ = next_unique_id_;
+        next_unique_id_++;
+        txn_requests_.Push(txn);
+        mutex_.Unlock(); 
+      }
+    }
+  }
 }
 
 void TxnProcessor::RunOCCParallelScheduler() {
@@ -604,4 +725,3 @@ void TxnProcessor::RunMVCCScheduler() {
   // suite]
   RunSerialScheduler();
 }
-

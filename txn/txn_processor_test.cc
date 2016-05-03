@@ -57,6 +57,19 @@ class RMWLoadGenFB : public LoadGen {
       wait_time_(wait_time) {
   }
 
+  // virtual Txn* NewTxn() {
+
+  //   int r = rand() % 100;
+  //   if (r < 0) // 0% are numbers
+  //     return new RMW(1, dbsize_, rsetsize_, wsetsize_, wait_time_);
+  //   else if (r < 20) // 20% are images
+  //     return new RMW(2, dbsize_, rsetsize_, wsetsize_, wait_time_);
+  //   else  // last 80% are strings
+  //     return new RMW(3, dbsize_, rsetsize_, wsetsize_, wait_time_);
+  //   // else
+  //   //   return new RMW(4, dbsize_, rsetsize_, wsetsize_, wait_time_);
+
+  // }
   virtual Txn* NewTxn() {
 
     int r = rand() % 100;
@@ -186,18 +199,23 @@ void Benchmark(const vector<LoadGen*>& lg) {
       // printf("made it through here\n");
       double throughput[3];
       for (uint32 round = 0; round < 3; round++) {
+        // printf("made it through here\n");
 
         int txn_count = 0;
 
         // Create TxnProcessor in next mode.
         TxnProcessor* p = new TxnProcessor(mode);
-        
+
         // Record start time.
         double start = GetTime();
+
+        // printf("made it through here\n");
 
         // Start specified number of txns running.
         for (int i = 0; i < active_txns; i++)
           p->NewTxnRequest(lg[exp]->NewTxn());
+
+        // printf("made it through here\n");
 
         // Keep 100 active txns at all times for the first full second.
         while (GetTime() < start + 1) {

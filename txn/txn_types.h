@@ -96,6 +96,18 @@ class RMW : public Txn {
     DCHECK(dbsize >= readsetsize + writesetsize);
 
     data_type_ = data_type;
+    if (data_type == 1) {
+      dbsize = 1000000;
+    }
+    else if (data_type == 2) {
+      dbsize = 100;
+    }
+    else if (data_type == 3) {
+      dbsize = 100;
+    }
+    else {
+      dbsize = 100;
+    }
 
     // Find readsetsize unique read keys.
     for (int i = 0; i < readsetsize; i++) {

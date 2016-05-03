@@ -41,7 +41,7 @@ bool Storage::ReadImage(Key key, Image* result, int txn_unique_id) {
 
     // read in each image bit by bit
     Image img = images_[key];
-    for (int x = 0; x < 500000; x++) {
+    for (int x = 0; x < 50; x++) {
       (*result).byte[x] = img.byte[x];
     }
     return true;
@@ -56,7 +56,7 @@ void Storage::WriteImage(Key key, Image image, int txn_unique_id) {
   // write each image bit by bit
 
   // Image img = images_[key];
-  for (int x = 0; x < 500000; x++) {
+  for (int x = 0; x < 50; x++) {
     (images_[key]).byte[x] = image.byte[x];
   }
   timestamps_[key] = GetTime();
@@ -65,9 +65,9 @@ void Storage::WriteImage(Key key, Image image, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitImageStorage() {
-  for (int i = 0; i < 1000;i++) {
+  for (int i = 0; i < 100;i++) {
     Image img;
-    for (int x = 0; x < 500000; x++) {
+    for (int x = 0; x < 50; x++) {
       img.byte[x] = 'a';
     }
     WriteImage(i, img, 0);
@@ -82,7 +82,7 @@ bool Storage::ReadString(Key key, String* result, int txn_unique_id) {
 
     // read in each image bit by bit
     String str = strings_[key];
-    for (int x = 0; x < 100; x++) {
+    for (int x = 0; x < 10; x++) {
       (*result).byte[x] = str.byte[x];
     }
     return true;
@@ -97,7 +97,7 @@ void Storage::WriteString(Key key, String str, int txn_unique_id) {
   // write each image bit by bit
 
   // Image img = images_[key];
-  for (int x = 0; x < 100; x++) {
+  for (int x = 0; x < 10; x++) {
     (strings_[key]).byte[x] = str.byte[x];
   }
   timestamps_[key] = GetTime();
@@ -106,9 +106,9 @@ void Storage::WriteString(Key key, String str, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitStringStorage() {
-  for (int i = 0; i < 1000;i++) {
+  for (int i = 0; i < 100;i++) {
     String str;
-    for (int x = 0; x < 100; x++) {
+    for (int x = 0; x < 10; x++) {
       str.byte[x] = 'a';
     }
     WriteString(i, str, 0);
@@ -122,7 +122,7 @@ bool Storage::ReadBlogString(Key key, BlogString* result, int txn_unique_id) {
 
     // read in each image bit by bit
     BlogString str = blog_strings_[key];
-    for (int x = 0; x < 2000; x++) {
+    for (int x = 0; x < 20; x++) {
       (*result).byte[x] = str.byte[x];
     }
     return true;
@@ -137,7 +137,7 @@ void Storage::WriteBlogString(Key key, BlogString str, int txn_unique_id) {
   // write each image bit by bit
 
   // Image img = images_[key];
-  for (int x = 0; x < 2000; x++) {
+  for (int x = 0; x < 20; x++) {
     (blog_strings_[key]).byte[x] = str.byte[x];
   }
   timestamps_[key] = GetTime();
@@ -146,9 +146,9 @@ void Storage::WriteBlogString(Key key, BlogString str, int txn_unique_id) {
 
 // Init the storage
 void Storage::InitBlogStringStorage() {
-  for (int i = 0; i < 1000;i++) {
+  for (int i = 0; i < 100;i++) {
     BlogString str;
-    for (int x = 0; x < 2000; x++) {
+    for (int x = 0; x < 20; x++) {
       str.byte[x] = 'a';
     }
     WriteBlogString(i, str, 0);

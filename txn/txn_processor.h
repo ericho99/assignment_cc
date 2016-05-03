@@ -92,6 +92,9 @@ class TxnProcessor {
   // transaction logic.
   void ExecuteTxn(Txn* txn);
 
+  // used for OCC
+  void ExecuteOCCTxn(Txn* txn);
+
   // Performs all reads required to execute an image transaction, then executes the
   // transaction logic.
   void ExecuteImageTxn(Txn* txn);
