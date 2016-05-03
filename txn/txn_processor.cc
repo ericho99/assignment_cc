@@ -182,89 +182,82 @@ Key *TxnProcessor::KeySorter(set<Key>* set) {
 void TxnProcessor::StartTwoExecuting(Txn *txn) {
   uint64_t i;
   Key *sortedReadset = KeySorter(&(txn->readset_));
-  printf("printing readset for %lu\n", txn->unique_id_);
-  for (i = 0; i < txn->readset_.size(); ++i) {
-    printf("key %lu for %lu\n", sortedReadset[i], txn->unique_id_);
-  }
-
   for (i = 0; i < txn->readset_.size(); ++i) {
     Key current = sortedReadset[i];
 
     while (!lm_->ReadLock(txn, current)) {
-      printf("SHOULDNT GET HERE\n");
       //continue;
       sleep(1); // adjust this if necessary
     }
 
-    //if (txn->data_type_ == 1) {
-    //  Value result;
-    //  if (storage_->Read(current, &result))
-    //    txn->reads_[current] = result;
-    //}
-    //else if (txn->data_type_ == 2) {
-    //  Image result;
-    //  if (storage_->ReadImage(current, &result))
-    //    txn->readsIMG_[current] = result;
-    //}
-    //else if (txn->data_type_ == 3) {
-    //  String result;
-    //  if (storage_->ReadString(current, &result))
-    //    txn->readsSTR_[current] = result;
-    //}
-    //else if (txn->data_type_ == 4) {
-    //  BlogString result;
-    //  if (storage_->ReadBlogString(current, &result))
-    //    txn->readsBSTR_[current] = result;
-    //}
+    if (txn->data_type_ == 1) {
+      Value result;
+      if (storage_->Read(current, &result))
+        txn->reads_[current] = result;
+    }
+    else if (txn->data_type_ == 2) {
+      Image result;
+      if (storage_->ReadImage(current, &result))
+        txn->readsIMG_[current] = result;
+    }
+    else if (txn->data_type_ == 3) {
+      String result;
+      if (storage_->ReadString(current, &result))
+        txn->readsSTR_[current] = result;
+    }
+    else if (txn->data_type_ == 4) {
+      BlogString result;
+      if (storage_->ReadBlogString(current, &result))
+        txn->readsBSTR_[current] = result;
+    }
   }
 
   free(sortedReadset);
 
-  //Key *sortedWriteset = KeySorter(&(txn->writeset_));
+  Key *sortedWriteset = KeySorter(&(txn->writeset_));
 
-  //for (i = 0; i < txn->writeset_.size(); ++i) {
-  //  printf("got write BADBADBADBADBAD\n");
-  //  Key current = sortedWriteset[i];
-  //  while (!lm_->WriteLock(txn, current)) {
-  //    //continue;
-  //    sleep(1); // adjust this if necessary
-  //  }
+  for (i = 0; i < txn->writeset_.size(); ++i) {
+    Key current = sortedWriteset[i];
+    while (!lm_->WriteLock(txn, current)) {
+      //continue;
+      sleep(1); // adjust this if necessary
+    }
 
-  //  if (txn->data_type_ == 1) {
-  //    Value result;
-  //    if (storage_->Read(current, &result)) {
-  //      txn->writes_[current] = result;
-  //    }
+    if (txn->data_type_ == 1) {
+      Value result;
+      if (storage_->Read(current, &result)) {
+        txn->writes_[current] = result;
+      }
 
-  //    storage_->Write(current, result, txn->unique_id_);
-  //  }
-  //  else if (txn->data_type_ == 2) {
-  //    Image result;
-  //    if (storage_->ReadImage(current, &result)) {
-  //      txn->readsIMG_[current] = result;
-  //    }
+      storage_->Write(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 2) {
+      Image result;
+      if (storage_->ReadImage(current, &result)) {
+        txn->readsIMG_[current] = result;
+      }
 
-  //    storage_->WriteImage(current, result, txn->unique_id_);
-  //  }
-  //  else if (txn->data_type_ == 3) {
-  //    String result;
-  //    if (storage_->ReadString(current, &result)) {
-  //      txn->readsSTR_[current] = result;
-  //    }
+      storage_->WriteImage(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 3) {
+      String result;
+      if (storage_->ReadString(current, &result)) {
+        txn->readsSTR_[current] = result;
+      }
 
-  //    storage_->WriteString(current, result, txn->unique_id_);
-  //  }
-  //  else if (txn->data_type_ == 4) {
-  //    BlogString result;
-  //    if (storage_->ReadBlogString(current, &result)) {
-  //      txn->readsBSTR_[current] = result;
-  //    }
+      storage_->WriteString(current, result, txn->unique_id_);
+    }
+    else if (txn->data_type_ == 4) {
+      BlogString result;
+      if (storage_->ReadBlogString(current, &result)) {
+        txn->readsBSTR_[current] = result;
+      }
 
-  //    storage_->WriteBlogString(current, result, txn->unique_id_);
-  //  }
-  //}
+      storage_->WriteBlogString(current, result, txn->unique_id_);
+    }
+  }
 
-  //free(sortedWriteset);
+  free(sortedWriteset);
 
   // Execute txn's program logic.
   txn->Run();
@@ -275,20 +268,14 @@ void TxnProcessor::StartTwoExecuting(Txn *txn) {
     lm_->Release(txn, current);
   }
 
-  //for (set<Key>::iterator it = txn->readset_.begin();
-  //     it != txn->readset_.end(); ++it) {
-  //  lm_->Release(txn, *it);
-  //}
-
   // Release write locks.
-  //for (set<Key>::iterator it = txn->writeset_.begin();
-  //     it != txn->writeset_.end(); ++it) {
-  //  lm_->Release(txn, *it);
-  //}
+  for (set<Key>::iterator it = txn->writeset_.begin();
+       it != txn->writeset_.end(); ++it) {
+    lm_->Release(txn, *it);
+  }
 
   // Return result to client.
   txn_results_.Push(txn);
-  //printf("finishing a txn\n");
   return;
 }
 
@@ -297,7 +284,6 @@ void TxnProcessor::RunTwoScheduler() {
   while (tp_.Active()) {
     // Start processing the next incoming transaction request.
     if (txn_requests_.Pop(&txn)) {
-      //printf("popping a txn\n");
       // Start txn running in its own thread.
       tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
           this,
