@@ -18,7 +18,7 @@ string ModeToString(CCMode mode) {
     case P_OCC:                  return " OCC-P    ";
     case MVCC:                   return " MVCC     ";
     case TWOPL:                  return " 2 Phase Locking";
-    case TWOPL2:                 return " 2 Phase  ";
+    case TWOPL2:                 return " 2PL";
     default:                     return "INVALID MODE";
   }
 }

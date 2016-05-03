@@ -19,6 +19,8 @@
 #include "utils/mutex.h"
 #include "utils/condition.h"
 
+#include <algorithm>
+
 
 using std::deque;
 using std::map;
@@ -175,4 +177,5 @@ class TxnProcessor {
 };
 
 #endif  // _TXN_PROCESSOR_H_
+
 
